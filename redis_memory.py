@@ -118,7 +118,7 @@ class RedisSegmentTree():
         for idx in indeces:
             pipe.get(CST.PRIORITIES_STR + str(idx))
         b_tab_old_values = pipe.execute()
-        b_max = b_tab_old_values.pop(0)  # CARE we remove first element cause we want to know the max priorities
+        b_max = b_tab_old_values.pop(0)  # CARE we remove first element because we want to know the max priorities
 
         self._propagate_multiple_values(pipe, indeces, priorities - np.float64(b_tab_old_values))
 
@@ -207,13 +207,13 @@ class RedisSegmentTree():
                 data_indexes[ind_data_index] = (
                                                            data_index + history_length - dist_to_actor_index + 1) % self.actor_capacity + id_current_actor * self.actor_capacity
                 # print("we changed ind_data_index " + str(ind_data_index) + " old was : ", data_index)
-                # print("new is " + str(data_indexes[ind_data_index]) + " cause actor id " + str(id_current_actor) + " had index too close, it was equal to : ", tab_index_actor[id_current_actor])
+                # print("new is " + str(data_indexes[ind_data_index]) + " because actor id " + str(id_current_actor) + " had index too close, it was equal to : ", tab_index_actor[id_current_actor])
 
             elif dist_to_actor_index < 0 and dist_to_actor_index >= -n_step_length:
                 data_indexes[ind_data_index] = (
                                                            data_index - n_step_length - dist_to_actor_index - 1) % self.actor_capacity + id_current_actor * self.actor_capacity
                 # print("we changed ind_data_index " + str(ind_data_index) + " old was : ", data_index)
-                # print("new is " + str(data_indexes[ind_data_index]) + " cause actor id " + str(id_current_actor) + " had index too close, it was equal to : ", tab_index_actor[id_current_actor])
+                # print("new is " + str(data_indexes[ind_data_index]) + " because actor id " + str(id_current_actor) + " had index too close, it was equal to : ", tab_index_actor[id_current_actor])
 
         return data_indexes + self.full_capacity - 1
 

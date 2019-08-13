@@ -126,7 +126,7 @@ while T < args.T_max:
             p.start()
 
         if T % CST.hack_set_full_capacity_to_true == 0:
-            mem_learner.transitions.get_current_capacity()  # Just a small hack to set memory_full to True cause now we sample in another Thread...
+            mem_learner.transitions.get_current_capacity()  # Just a small hack to set memory_full to True because now we sample in another Thread...
 
         mem_learner.priority_weight = min(mem_learner.priority_weight + priority_weight_increase,
                                           1)  # Anneal importance sampling weight β to 1

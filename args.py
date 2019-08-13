@@ -70,6 +70,14 @@ def return_args():
     parser.add_argument('--num-tau-prime-samples', default=64, type=int, help="N' in equation 3 in IQN paper")
     parser.add_argument('--num-quantile-samples', default=32, type=int, help='K in equation 3 in IQN paper')
     parser.add_argument('--quantile-embedding-dim', default=64, type=int, help='n in equation 4 in IQN paper')
+    #IQN parameters
+
+    #Rainbow only parameters(no IQN and C51 instead)
+    parser.add_argument('--rainbow-only', type=bool, default=True, help='Remove IQN and use standard Rainbow instead (still distributed with Ape-X')
+    parser.add_argument('--atoms', type=int, default=51, metavar='C', help='Discretised size of value distribution')
+    parser.add_argument('--V-min', type=float, default=-10, metavar='V', help='Minimum of value distribution support')
+    parser.add_argument('--V-max', type=float, default=10, metavar='V', help='Maximum of value distribution support')
+    # Rainbow only parameters(no IQN and C51 instead)
 
     parser.add_argument('--gpu-number', type=int, default=0, help='GPU to use')
 
@@ -142,5 +150,8 @@ def return_args():
         torch.backends.cudnn.enabled = not args.disable_cudnn
     else:
         args.device = torch.device('cpu')
+
+    if args.rainbow_only:
+        print("Launching an experiment with Rainbow only (i.e. C51 instead of IQN)")
 
     return args

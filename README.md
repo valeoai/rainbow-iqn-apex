@@ -180,8 +180,11 @@ in previous papers is indeed misleading. General RL agents are definitely far fr
 <a name="acknow">Acknowledgements</a>
 ----------------
 
-- [@kaixhin](https://github.com/Kaixhin) for [Rainbow](https://github.com/Kaixhin/Rainbow)
-- [@dopamine](https://github.com/google/dopamine) for [IQN](https://github.com/google/dopamine/tree/master/dopamine/agents/implicit_quantile)
+- This codebase is heavily borrowed from [@kaixhin](https://github.com/Kaixhin) for [Rainbow](https://github.com/Kaixhin/Rainbow) 
+(see Kaixhin license there [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](Kaixhin_LICENSE.md))
+- [@dopamine](https://github.com/google/dopamine) for the Tensorflow implementation 
+of [IQN](https://github.com/google/dopamine/tree/master/dopamine/agents/implicit_quantile) (see `compute_loss_iqn.py` 
+for Dopamine license)
 
 <a name="ref">References</a>
 ----------

@@ -69,7 +69,7 @@ def launch_actor(id_actor, args, redis_servor):
         # Variables for plot and dump in csv only
         Tab_T_actors, Tab_T_learner, Tab_length_episode, Tab_longest_episode, tab_rewards_plot, best_avg_reward = [], [], [], [], [], -1e10
         
-        # We initialize all buffer with 0 cause sometimes there are not totally filled for the first evaluation step and this leads to a bug in the plot...
+        # We initialize all buffer with 0 because sometimes there are not totally filled for the first evaluation step and this leads to a bug in the plot...
         total_reward_buffer_SABER = deque([0] * args.evaluation_episodes, maxlen=args.evaluation_episodes)
         total_reward_buffer_30min = deque([0] * args.evaluation_episodes, maxlen=args.evaluation_episodes)
         total_reward_buffer_5min = deque([0] * args.evaluation_episodes, maxlen=args.evaluation_episodes)
@@ -190,7 +190,7 @@ def launch_actor(id_actor, args, redis_servor):
             step_all_agent = pipe.execute()
 
             T_learner = int(
-                step_all_agent.pop(0))  # We remove first element of the list cause it's the number of learner step
+                step_all_agent.pop(0))  # We remove first element of the list because it's the number of learner step
             T_total_actors = 0
             if args.nb_actor == 1: # If only one actor don't bother checking all values in redis server, we got this value locally
                 T_total_actors = T_actor
@@ -253,7 +253,7 @@ while True:
 # Check if learner finished to initialize the redis-servor
 model_weight_from_learner = redis_servor.get(CST.MODEL_WEIGHT_STR)
 while model_weight_from_learner is None:
-    print("redis servor not initialized, probably cause learner is still working on it") # This should not take more than 30 seconds!
+    print("redis servor not initialized, probably because learner is still working on it") # This should not take more than 30 seconds!
     time.sleep(10)
     model_weight_from_learner = redis_servor.get(CST.MODEL_WEIGHT_STR)
 launch_actor(args.id_actor, args, redis_servor)

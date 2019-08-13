@@ -11,6 +11,7 @@ import io
 import math
 
 import CONSTANTS as CST
+import compute_loss_iqn
 
 class Agent(): # This class handle both actor and learner because most of their methods are shared
     def __init__(self, args, action_space, redis_servor):
@@ -43,11 +44,21 @@ class Agent(): # This class handle both actor and learner because most of their 
             param.requires_grad = False
 
         self.optimiser = optim.Adam(self.online_net.parameters(), lr=args.lr, eps=args.adam_eps)
-        
-        self.kappa = args.kappa
-        self.num_tau_samples = args.num_tau_samples
-        self.num_tau_prime_samples = args.num_tau_prime_samples
-        self.num_quantile_samples = args.num_quantile_samples
+
+        self.rainbow_only = args.rainbow_only
+
+        if self.rainbow_only: #Using standard Rainbow (i.e. C51 and no IQN)
+            self.atoms = args.atoms
+            self.Vmin = args.V_min
+            self.Vmax = args.V_max
+            self.support = torch.linspace(args.V_min, args.V_max, self.atoms).to(
+                device=args.device)  # Support (range) of z
+            self.delta_z = (args.V_max - args.V_min) / (self.atoms - 1)
+        else: #Rainbow-IQN
+            self.kappa = args.kappa
+            self.num_tau_samples = args.num_tau_samples
+            self.num_tau_prime_samples = args.num_tau_prime_samples
+            self.num_quantile_samples = args.num_quantile_samples
 
     # Resets noisy weights in all linear layers (of online net only)
     def reset_noise(self):
@@ -56,156 +67,74 @@ class Agent(): # This class handle both actor and learner because most of their 
     # Acts based on single state (no batch)
     def act(self, state_buffer):
         state = torch.from_numpy(np.stack(state_buffer).astype(np.float32) / 255).to(self.device, dtype=torch.float32)
-        with torch.no_grad():  
-            quantile_values, _ = self.online_net(state.unsqueeze(0), self.num_quantile_samples)
-            return quantile_values.mean(0).argmax(0).item()
+        if self.rainbow_only:
+            with torch.no_grad():
+                return (self.online_net(state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
+        else:
+            with torch.no_grad():
+                quantile_values, _ = self.online_net(state.unsqueeze(0), self.num_quantile_samples)
+                return quantile_values.mean(0).argmax(0).item()
 
     def update_target_net(self):
         self.target_net.load_state_dict(self.online_net.state_dict())
 
     #  Compute loss for actor or learner, if it's for learner then we have to keep gradient flowing but not if it's for actor which is just use to initialize priorities!
     def compute_loss_actor_or_learner(self, states, actions, returns, next_states, nonterminals):
+        if self.rainbow_only: #Rainbow only loss (C51 in stead of IQN)
+            batch_size = len(states)
 
-        batch_size = len(states)
+            # Calculate current state probabilities (online network noise already sampled)
+            log_ps = self.online_net(states, log=True)  # Log probabilities log p(s_t, ·; θonline)
+            log_ps_a = log_ps[range(batch_size), actions]  # log p(s_t, a_t; θonline)
 
-        with torch.no_grad():
-            
-            ##################################################
-            # Compute target quantile values, so no gradient #
-            # there in both case (actor or learner)          #
-            ##################################################
-            
-            # Shape of returns will be (num_tau_prime_samples x batch_size) x 1
-            returns = returns[:,None].repeat([self.num_tau_prime_samples, 1])
-            
-            # Shape of gamma_with_terminal will be (num_tau_prime_samples x batch_size) x 1
-            gamma_with_terminal = (self.discount ** self.n) * nonterminals[:,None]
-            gamma_with_terminal = gamma_with_terminal.repeat([self.num_tau_prime_samples, 1])
+            with torch.no_grad():
 
-#            print("gamma_with_terminal.shape = ", gamma_with_terminal.shape)
-            
-            # Compute target quantiles values Q(s_t+n, num_quantile_samples; θonline)
-            # We used online_net there cause we use double DQN
-            self.online_net.reset_noise()
-            target_quantile_values_action, _ = self.online_net(next_states, self.num_quantile_samples)
-            target_quantile_values_action = target_quantile_values_action.reshape([
-                    self.num_quantile_samples, batch_size, self.action_space])
-    
-            replay_net_target_q_values = torch.mean(target_quantile_values_action, dim = 0)
-#            print("replay_net_target_q_values.shape = ", replay_net_target_q_values.shape)
-            
-            # Perform argmax action selection using online network: argmax_a[Q(s_t+n; θonline)]
-            replay_next_qt_argmax = torch.argmax(replay_net_target_q_values, dim = 1)
-#            print("replay_next_qt_argmax.shape = ", replay_next_qt_argmax.shape)
-            
-            # Shape of replay_next_qt_argmax will be (num_tau_prime_samples x batch_size) x 1
-            replay_next_qt_argmax = replay_next_qt_argmax[:,None].repeat([self.num_tau_prime_samples, 1])
-#            print("replay_next_qt_argmax.shape = ", replay_next_qt_argmax.shape)
-            
-            # Compute target quantiles values Q(s_t+n, num_tau_prime_samples; θtarget)
-            # Shape of replay_net_target_quantile_values will be (num_tau_prime_samples x batch_size) x action_space
-            self.target_net.reset_noise()
-            replay_net_target_quantile_values, _ = self.target_net(next_states, self.num_tau_prime_samples)
-#            print("replay_net_target_quantile_values.shape = ", replay_net_target_quantile_values.shape)
-            
-            # Double-Q values Q(s_t+n, argmax_a[Q(s_t+n; θonline)]; θtarget)
-            # Shape of target_quantile_values will be (num_tau_prime_samples x batch_size) x 1
-            target_quantile_values = torch.gather(replay_net_target_quantile_values, 1, replay_next_qt_argmax)
-#            print("target_quantile_values.shape = ", target_quantile_values.shape)
+                ##################################################
+                # Compute target quantile values, so no gradient #
+                # there in both case (actor or learner)          #
+                ##################################################
 
-            # Shape of full_target_quantile_values will be (num_tau_prime_samples x batch_size) x 1
-            full_target_quantile_values = returns + gamma_with_terminal * target_quantile_values
-#            print("full_target_quantile_values.shape = ", full_target_quantile_values.shape)
-            
-            # Reshape to self.num_tau_prime_samples x batch_size x 1 since this is
-            # the manner in which the target_quantile_values are tiled.         
-            full_target_quantile_values = full_target_quantile_values.reshape([self.num_tau_prime_samples,batch_size, 1])
-#            print("full_target_quantile_values.shape = ", full_target_quantile_values.shape)
-            
-            # Transpose dimensions so that the dimensionality is batch_size x
-            # self.num_tau_prime_samples x 1 to prepare for computation of
-            # Bellman errors.
-            # Final shape of full_target_quantile_values:
-            # batch_size x num_tau_prime_samples x 1.
-            full_target_quantile_values = full_target_quantile_values.permute([1, 0, 2])
-#            print("full_target_quantile_values.shape = ", full_target_quantile_values.shape)
-            
-            ##################################################
-            # Compute target quantile values, so no gradient #
-            # there in both case (actor or learner)          #
-            ##################################################
-            
-        # Compute current quantiles values Q(s_t, num_tau_samples; θonline)
-        # Shape of replay_net_quantile_values will be (num_tau_samples x batch_size) x action_space
-        self.online_net.reset_noise()
-        replay_net_quantile_values, replay_quantiles = self.online_net(states, self.num_tau_samples)
-#        print("replay_net_quantile_values.shape = ", replay_net_quantile_values.shape)
+                # Calculate nth next state probabilities
+                pns = self.online_net(next_states)  # Probabilities p(s_t+n, ·; θonline)
+                dns = self.support.expand_as(pns) * pns  # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
+                argmax_indices_ns = dns.sum(2).argmax(
+                    1)  # Perform argmax action selection using online network: argmax_a[(z, p(s_t+n, a; θonline))]
+                self.target_net.reset_noise()  # Sample new target net noise
+                pns = self.target_net(next_states)  # Probabilities p(s_t+n, ·; θtarget)
+                pns_a = pns[range(
+                    batch_size), argmax_indices_ns]  # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θonline))]; θtarget)
 
-        # Shape of actions will be (num_tau_samples x batch_size) x 1
-        actions = actions[:,None].repeat([self.num_tau_samples, 1])
-#        print("actions.shape = ", actions.shape)
-        
-        # Compute current quantiles values Q(s_t, actions; θnline)
-        # Shape of chosen_action_quantile_values will be (num_tau_samples x batch_size) x 1
-        chosen_action_quantile_values = torch.gather(replay_net_quantile_values, 1, actions)
-#        print("chosen_action_quantile_values.shape = ", chosen_action_quantile_values.shape)
+                # Compute Tz (Bellman operator T applied to z)
 
-        # Reshape to self.num_tau_samples x batch_size x 1 since this is
-        # the manner in which the target_quantile_values are tiled.         
-        chosen_action_quantile_values = chosen_action_quantile_values.reshape([self.num_tau_samples,batch_size, 1])
-#        print("chosen_action_quantile_values.shape = ", chosen_action_quantile_values.shape)
+                Tz = returns.unsqueeze(1) + nonterminals.unsqueeze(1) * (
+                            self.discount ** self.n) * self.support.unsqueeze(
+                    0)  # Tz = R^n + (γ^n)z (accounting for terminal states)
+                Tz = Tz.clamp(min=self.Vmin, max=self.Vmax)  # Clamp between supported values
+                # Compute L2 projection of Tz onto fixed support z
+                b = (Tz - self.Vmin) / self.delta_z  # b = (Tz - Vmin) / Δz
+                l, u = b.floor().to(torch.int64), b.ceil().to(torch.int64)
+                # Fix disappearing probability mass when l = b = u (b is int)
+                l[(u > 0) * (l == u)] -= 1
+                u[(l < (self.atoms - 1)) * (l == u)] += 1
 
-        # Transpose dimensions so that the dimensionality is batch_size x
-        # self.num_tau_samples x 1 to prepare for computation of
-        # Bellman errors.
-        # Final shape of chosen_action_quantile_values:
-        # batch_size x num_tau_samples x 1.            
-        chosen_action_quantile_values = chosen_action_quantile_values.permute([1, 0, 2])
-#        print("chosen_action_quantile_values.shape = ", chosen_action_quantile_values.shape)
+                # Distribute probability of Tz
+                m = states.new_zeros(batch_size, self.atoms)
+                offset = torch.linspace(0, ((batch_size - 1) * self.atoms), batch_size).unsqueeze(1).expand(
+                    batch_size, self.atoms).to(actions)
+                m.view(-1).index_add_(0, (l + offset).view(-1),
+                                      (pns_a * (u.float() - b)).view(-1))  # m_l = m_l + p(s_t+n, a*)(u - b)
+                m.view(-1).index_add_(0, (u + offset).view(-1),
+                                      (pns_a * (b - l.float())).view(-1))  # m_u = m_u + p(s_t+n, a*)(b - l)
 
-        # Shape of bellman_erors and huber_loss:
-        # batch_size x num_tau_prime_samples x num_tau_samples x 1.
-        bellman_errors = full_target_quantile_values[:, :, None, :] - chosen_action_quantile_values[:, None, :, :]
-#        print("bellman_errors.shape = ", bellman_errors.shape)
+                ##################################################
+                # Compute target quantile values, so no gradient #
+                # there in both case (actor or learner)          #
+                ##################################################
 
-        # The huber loss (see Section 2.3 of the paper) is defined via two cases:
-        # case_one: |bellman_errors| <= kappa
-        # case_two: |bellman_errors| > kappa
-        huber_loss_case_one = (torch.abs(bellman_errors) <= self.kappa).float() * 0.5 * bellman_errors ** 2
-        huber_loss_case_two = (torch.abs(bellman_errors) > self.kappa).float() * self.kappa * (torch.abs(bellman_errors) - 0.5 * self.kappa)
-        huber_loss = huber_loss_case_one + huber_loss_case_two
-#        print("huber_loss.shape = ", huber_loss.shape)
-        
-        # Reshape replay_quantiles to batch_size x num_tau_samples x 1
-#        replay_quantiles = torch.from_numpy(replay_quantiles).to(self.device, dtype=torch.float32)
-        replay_quantiles = torch.reshape(replay_quantiles, [self.num_tau_samples, batch_size, 1])
-#        print("replay_quantiles.shape = ", replay_quantiles.shape)
-        replay_quantiles = replay_quantiles.permute([1, 0, 2])
-#        print("replay_quantiles.shape = ", replay_quantiles.shape)
+            loss = -torch.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimises DKL(m||p(s_t, a_t)))
 
-        # Tile by num_tau_prime_samples along a new dimension. Shape is now
-        # batch_size x num_tau_prime_samples x num_tau_samples x 1.
-        # These quantiles will be used for computation of the quantile huber loss
-        # below (see section 2.3 of the paper).
-        replay_quantiles = replay_quantiles[:, None, :, :].repeat([1, self.num_tau_prime_samples, 1, 1])
-#        print("replay_quantiles.shape = ", replay_quantiles.shape)
-        
-        # Shape: batch_size x num_tau_prime_samples x num_tau_samples x 1.
-        quantile_huber_loss = (torch.abs(replay_quantiles - ((bellman_errors < 0).float()).detach()) * huber_loss) / self.kappa
-#        print("quantile_huber_loss.shape = ", quantile_huber_loss.shape)
-        
-        # Sum over current quantile value (num_tau_samples) dimension,
-        # average over target quantile value (num_tau_prime_samples) dimension.
-        # Shape: batch_size x num_tau_prime_samples x 1.
-        loss = torch.sum(quantile_huber_loss, dim=2)
-#        print("loss.shape = ", loss.shape)
-        # Shape: batch_size x 1.
-        loss = torch.mean(loss, dim=1)
-#        print("loss.shape = ", loss.shape)
-
-        # Shape: batch_size.
-        loss = loss[:,0]
-#        print("loss.shape = ", loss.shape)
+        else: #IQN loss
+            loss = compute_loss_iqn.compute_loss_actor_or_learner_iqn(self, states, actions, returns, next_states, nonterminals)
         return loss
 
     ########################
@@ -284,7 +213,7 @@ class Agent(): # This class handle both actor and learner because most of their 
     # SOMETHING TO KEEP IN MIND, THE RETURNS CAN BE WRONG NEAR TERMINAL STATE AND IF REWARD AT BEGINNING OF EPISODE ARE NOT ZERO... (should we care?)
     # In fact the states and next_states too are wrong near terminal state... it's kinda hard to take care of this properly, so we just initiliaze priorities pretty badly around terminal state...
     def compute_priorities(self, tab_state, tab_action, tab_reward, tab_nonterminal, priority_exponent):
-        # REMINDER INDICE IN tab_state goes from -3 to len_buffer, the idea is that we got 3 more states cause we stack 4 states before sending it to network
+        # REMINDER INDICE IN tab_state goes from -3 to len_buffer, the idea is that we got 3 more states because we stack 4 states before sending it to network
         len_buffer = len(tab_action)
         assert len(tab_action) == len(tab_reward) == len(tab_nonterminal) == len(tab_state) - self.history + 1
 
