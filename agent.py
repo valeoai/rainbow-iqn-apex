@@ -1,19 +1,19 @@
 import os
 import random
 import torch
-from torch import nn, optim
+from torch import optim
 import numpy as np
 
 from model import DQN
 
-import time
 import io
 import math
 
 import CONSTANTS as CST
 import compute_loss_iqn
 
-class Agent(): # This class handle both actor and learner because most of their methods are shared
+
+class Agent():  # This class handle both actor and learner because most of their methods are shared
     def __init__(self, args, action_space, redis_servor):
         self.action_space = action_space
 
@@ -47,14 +47,14 @@ class Agent(): # This class handle both actor and learner because most of their 
 
         self.rainbow_only = args.rainbow_only
 
-        if self.rainbow_only: #Using standard Rainbow (i.e. C51 and no IQN)
+        if self.rainbow_only:  # Using standard Rainbow (i.e. C51 and no IQN)
             self.atoms = args.atoms
             self.Vmin = args.V_min
             self.Vmax = args.V_max
             self.support = torch.linspace(args.V_min, args.V_max, self.atoms).to(
                 device=args.device)  # Support (range) of z
             self.delta_z = (args.V_max - args.V_min) / (self.atoms - 1)
-        else: #Rainbow-IQN
+        else:  # Rainbow-IQN
             self.kappa = args.kappa
             self.num_tau_samples = args.num_tau_samples
             self.num_tau_prime_samples = args.num_tau_prime_samples
@@ -66,7 +66,8 @@ class Agent(): # This class handle both actor and learner because most of their 
 
     # Acts based on single state (no batch)
     def act(self, state_buffer):
-        state = torch.from_numpy(np.stack(state_buffer).astype(np.float32) / 255).to(self.device, dtype=torch.float32)
+        state = torch.from_numpy(np.stack(state_buffer).astype(np.float32) /
+                                 255).to(self.device, dtype=torch.float32)
         if self.rainbow_only:
             with torch.no_grad():
                 return (self.online_net(state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
@@ -78,9 +79,10 @@ class Agent(): # This class handle both actor and learner because most of their 
     def update_target_net(self):
         self.target_net.load_state_dict(self.online_net.state_dict())
 
-    #  Compute loss for actor or learner, if it's for learner then we have to keep gradient flowing but not if it's for actor which is just use to initialize priorities!
+    # Compute loss for actor or learner, if it's for learner then we have to keep gradient flowing
+    # but not if it's for actor which is just use to initialize priorities!
     def compute_loss_actor_or_learner(self, states, actions, returns, next_states, nonterminals):
-        if self.rainbow_only: #Rainbow only loss (C51 in stead of IQN)
+        if self.rainbow_only:  # Rainbow only loss (C51 in stead of IQN)
             batch_size = len(states)
 
             # Calculate current state probabilities (online network noise already sampled)
@@ -95,14 +97,17 @@ class Agent(): # This class handle both actor and learner because most of their 
                 ##################################################
 
                 # Calculate nth next state probabilities
-                pns = self.online_net(next_states)  # Probabilities p(s_t+n, ·; θonline)
-                dns = self.support.expand_as(pns) * pns  # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
-                argmax_indices_ns = dns.sum(2).argmax(
-                    1)  # Perform argmax action selection using online network: argmax_a[(z, p(s_t+n, a; θonline))]
+                # Probabilities p(s_t+n, ·; θonline)
+                pns = self.online_net(next_states)
+                # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
+                dns = self.support.expand_as(pns) * pns
+                # Perform argmax action selection using online network:
+                # argmax_a[(z, p(s_t+n, a; θonline))]
+                argmax_indices_ns = dns.sum(2).argmax(1)
                 self.target_net.reset_noise()  # Sample new target net noise
                 pns = self.target_net(next_states)  # Probabilities p(s_t+n, ·; θtarget)
-                pns_a = pns[range(
-                    batch_size), argmax_indices_ns]  # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θonline))]; θtarget)
+                # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θonline))]; θtarget)
+                pns_a = pns[range(batch_size), argmax_indices_ns]
 
                 # Compute Tz (Bellman operator T applied to z)
 
@@ -119,33 +124,38 @@ class Agent(): # This class handle both actor and learner because most of their 
 
                 # Distribute probability of Tz
                 m = states.new_zeros(batch_size, self.atoms)
-                offset = torch.linspace(0, ((batch_size - 1) * self.atoms), batch_size).unsqueeze(1).expand(
-                    batch_size, self.atoms).to(actions)
+                offset = torch.linspace(0, ((batch_size - 1) * self.atoms), batch_size).unsqueeze(
+                    1).expand(batch_size, self.atoms).to(actions)
+                # m_l = m_l + p(s_t+n, a*)(u - b)
                 m.view(-1).index_add_(0, (l + offset).view(-1),
-                                      (pns_a * (u.float() - b)).view(-1))  # m_l = m_l + p(s_t+n, a*)(u - b)
+                                      (pns_a * (u.float() - b)).view(-1))
+                # m_u = m_u + p(s_t+n, a*)(b - l)
                 m.view(-1).index_add_(0, (u + offset).view(-1),
-                                      (pns_a * (b - l.float())).view(-1))  # m_u = m_u + p(s_t+n, a*)(b - l)
+                                      (pns_a * (b - l.float())).view(-1))
 
                 ##################################################
                 # Compute target quantile values, so no gradient #
                 # there in both case (actor or learner)          #
                 ##################################################
 
-            loss = -torch.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimises DKL(m||p(s_t, a_t)))
+            loss = -torch.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimise DKL(m||p(s_t, a_t)))
 
-        else: #IQN loss
-            loss = compute_loss_iqn.compute_loss_actor_or_learner_iqn(self, states, actions, returns, next_states, nonterminals)
+        else:  # IQN loss
+            loss = compute_loss_iqn.compute_loss_actor_or_learner_iqn(
+                self, states, actions, returns, next_states, nonterminals)
         return loss
 
     ########################
-    ### ONLY FOR LEARNER ###
+    #   ONLY FOR LEARNER   #
     ########################
 
     def learn(self, mem_redis, mp_queue):
         # Sample transitions
-        idxs, states, actions, returns, next_states, nonterminals, weights = mem_redis.get_sample_from_mp_queue(mp_queue)
+        idxs, states, actions, returns, next_states, nonterminals, weights\
+            = mem_redis.get_sample_from_mp_queue(mp_queue)
 
-        loss = self.compute_loss_actor_or_learner(states, actions, returns, next_states, nonterminals)
+        loss = self.compute_loss_actor_or_learner(states, actions,
+                                                  returns, next_states, nonterminals)
 
         self.online_net.zero_grad()
         (weights * loss).mean().backward()  # Importance weight losses
@@ -158,7 +168,7 @@ class Agent(): # This class handle both actor and learner because most of their 
         # return idxs, priorities
 
     # Acts with an ε-greedy policy (used for evaluation only in test_multiple_seed.py)
-    def act_e_greedy(self, state_buffer, epsilon=0.001):  # High ε can reduce evaluation scores drastically
+    def act_e_greedy(self, state_buffer, epsilon=0.001):  # High ε can reduce eval score drastically
         return random.randrange(self.action_space) if random.random() < epsilon else self.act(state_buffer)
 
     # Save model parameters on current device (don't move model between devices)
