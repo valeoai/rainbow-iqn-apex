@@ -1,0 +1,10 @@
+name: r-iqn-apex
+channels:
+- pytorch
+dependencies:
+- plotly
+- pytorch
+- pip:
+  - atari-py
+  - opencv-python
+  - redlock-py

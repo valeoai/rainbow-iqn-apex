@@ -1,0 +1,1 @@
+This is the folder which contains all the result files. The saved model (by default 2 are saved, the best one encountered while training and the last). There is a reward plot along time. Moreover all score at 5min, 30min and infinite time (SABER) are saved in a csv file that you could parse after.
