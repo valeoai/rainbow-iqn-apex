@@ -1,4 +1,4 @@
-'''
+"""
 
 Copyright 2018 The Dopamine Authors.  All rights reserved.
 
@@ -204,13 +204,14 @@ Copyright 2018 The Dopamine Authors.  All rights reserved.
    See the License for the specific language governing permissions and
    limitations under the License.
 
-We started from the Tensorflow implementation of the IQN loss from Dopamine github (see License Above) and we
-translate it to PyTorch.
+We started from the Tensorflow implementation of the IQN loss from Dopamine github
+(see License Above) and we translate it to PyTorch.
 
-'''
+"""
 
 
 import torch
+
 
 def compute_loss_actor_or_learner_iqn(agent, states, actions, returns, next_states, nonterminals):
     batch_size = len(states)
@@ -233,9 +234,12 @@ def compute_loss_actor_or_learner_iqn(agent, states, actions, returns, next_stat
         # Compute target quantiles values Q(s_t+n, num_quantile_samples; θonline)
         # We used online_net there because we use double DQN
         agent.online_net.reset_noise()
-        target_quantile_values_action, _ = agent.online_net(next_states, agent.num_quantile_samples)
-        target_quantile_values_action = target_quantile_values_action.reshape([
-            agent.num_quantile_samples, batch_size, agent.action_space])
+        target_quantile_values_action, _ = agent.online_net(
+            next_states, agent.num_quantile_samples
+        )
+        target_quantile_values_action = target_quantile_values_action.reshape(
+            [agent.num_quantile_samples, batch_size, agent.action_space]
+        )
 
         replay_net_target_q_values = torch.mean(target_quantile_values_action, dim=0)
         #            print("replay_net_target_q_values.shape = ", replay_net_target_q_values.shape)
@@ -245,28 +249,36 @@ def compute_loss_actor_or_learner_iqn(agent, states, actions, returns, next_stat
         #            print("replay_next_qt_argmax.shape = ", replay_next_qt_argmax.shape)
 
         # Shape of replay_next_qt_argmax will be (num_tau_prime_samples x batch_size) x 1
-        replay_next_qt_argmax = replay_next_qt_argmax[:, None].repeat([agent.num_tau_prime_samples, 1])
-        #            print("replay_next_qt_argmax.shape = ", replay_next_qt_argmax.shape)
+        replay_next_qt_argmax = replay_next_qt_argmax[:, None].repeat(
+            [agent.num_tau_prime_samples, 1]
+        )
+        # print("replay_next_qt_argmax.shape = ", replay_next_qt_argmax.shape)
 
         # Compute target quantiles values Q(s_t+n, num_tau_prime_samples; θtarget)
-        # Shape of replay_net_target_quantile_values will be (num_tau_prime_samples x batch_size) x action_space
+        # Shape of replay_net_target_quantile_values will be
+        # (num_tau_prime_samples x batch_size) x action_space
         agent.target_net.reset_noise()
-        replay_net_target_quantile_values, _ = agent.target_net(next_states, agent.num_tau_prime_samples)
-        #            print("replay_net_target_quantile_values.shape = ", replay_net_target_quantile_values.shape)
+        replay_net_target_quantile_values, _ = agent.target_net(
+            next_states, agent.num_tau_prime_samples
+        )
 
         # Double-Q values Q(s_t+n, argmax_a[Q(s_t+n; θonline)]; θtarget)
         # Shape of target_quantile_values will be (num_tau_prime_samples x batch_size) x 1
-        target_quantile_values = torch.gather(replay_net_target_quantile_values, 1, replay_next_qt_argmax)
-        #            print("target_quantile_values.shape = ", target_quantile_values.shape)
+        target_quantile_values = torch.gather(
+            replay_net_target_quantile_values, 1, replay_next_qt_argmax
+        )
+        # print("target_quantile_values.shape = ", target_quantile_values.shape)
 
         # Shape of full_target_quantile_values will be (num_tau_prime_samples x batch_size) x 1
         full_target_quantile_values = returns + gamma_with_terminal * target_quantile_values
-        #            print("full_target_quantile_values.shape = ", full_target_quantile_values.shape)
+        # print("full_target_quantile_values.shape = ", full_target_quantile_values.shape)
 
         # Reshape to agent.num_tau_prime_samples x batch_size x 1 since this is
         # the manner in which the target_quantile_values are tiled.
-        full_target_quantile_values = full_target_quantile_values.reshape([agent.num_tau_prime_samples, batch_size, 1])
-        #            print("full_target_quantile_values.shape = ", full_target_quantile_values.shape)
+        full_target_quantile_values = full_target_quantile_values.reshape(
+            [agent.num_tau_prime_samples, batch_size, 1]
+        )
+        # print("full_target_quantile_values.shape = ", full_target_quantile_values.shape)
 
         # Transpose dimensions so that the dimensionality is batch_size x
         # agent.num_tau_prime_samples x 1 to prepare for computation of
@@ -274,7 +286,7 @@ def compute_loss_actor_or_learner_iqn(agent, states, actions, returns, next_stat
         # Final shape of full_target_quantile_values:
         # batch_size x num_tau_prime_samples x 1.
         full_target_quantile_values = full_target_quantile_values.permute([1, 0, 2])
-    #            print("full_target_quantile_values.shape = ", full_target_quantile_values.shape)
+    # print("full_target_quantile_values.shape = ", full_target_quantile_values.shape)
 
     ##################################################
     # Compute target quantile values, so no gradient #
@@ -285,21 +297,23 @@ def compute_loss_actor_or_learner_iqn(agent, states, actions, returns, next_stat
     # Shape of replay_net_quantile_values will be (num_tau_samples x batch_size) x action_space
     agent.online_net.reset_noise()
     replay_net_quantile_values, replay_quantiles = agent.online_net(states, agent.num_tau_samples)
-    #        print("replay_net_quantile_values.shape = ", replay_net_quantile_values.shape)
+    # print("replay_net_quantile_values.shape = ", replay_net_quantile_values.shape)
 
     # Shape of actions will be (num_tau_samples x batch_size) x 1
     actions = actions[:, None].repeat([agent.num_tau_samples, 1])
-    #        print("actions.shape = ", actions.shape)
+    # print("actions.shape = ", actions.shape)
 
     # Compute current quantiles values Q(s_t, actions; θnline)
     # Shape of chosen_action_quantile_values will be (num_tau_samples x batch_size) x 1
     chosen_action_quantile_values = torch.gather(replay_net_quantile_values, 1, actions)
-    #        print("chosen_action_quantile_values.shape = ", chosen_action_quantile_values.shape)
+    # print("chosen_action_quantile_values.shape = ", chosen_action_quantile_values.shape)
 
     # Reshape to agent.num_tau_samples x batch_size x 1 since this is
     # the manner in which the target_quantile_values are tiled.
-    chosen_action_quantile_values = chosen_action_quantile_values.reshape([agent.num_tau_samples, batch_size, 1])
-    #        print("chosen_action_quantile_values.shape = ", chosen_action_quantile_values.shape)
+    chosen_action_quantile_values = chosen_action_quantile_values.reshape(
+        [agent.num_tau_samples, batch_size, 1]
+    )
+    # print("chosen_action_quantile_values.shape = ", chosen_action_quantile_values.shape)
 
     # Transpose dimensions so that the dimensionality is batch_size x
     # agent.num_tau_samples x 1 to prepare for computation of
@@ -307,51 +321,60 @@ def compute_loss_actor_or_learner_iqn(agent, states, actions, returns, next_stat
     # Final shape of chosen_action_quantile_values:
     # batch_size x num_tau_samples x 1.
     chosen_action_quantile_values = chosen_action_quantile_values.permute([1, 0, 2])
-    #        print("chosen_action_quantile_values.shape = ", chosen_action_quantile_values.shape)
+    # print("chosen_action_quantile_values.shape = ", chosen_action_quantile_values.shape)
 
     # Shape of bellman_erors and huber_loss:
     # batch_size x num_tau_prime_samples x num_tau_samples x 1.
-    bellman_errors = full_target_quantile_values[:, :, None, :] - chosen_action_quantile_values[:, None, :, :]
-    #        print("bellman_errors.shape = ", bellman_errors.shape)
+    bellman_errors = (
+        full_target_quantile_values[:, :, None, :] - chosen_action_quantile_values[:, None, :, :]
+    )
+    # print("bellman_errors.shape = ", bellman_errors.shape)
 
     # The huber loss (see Section 2.3 of the paper) is defined via two cases:
     # case_one: |bellman_errors| <= kappa
     # case_two: |bellman_errors| > kappa
-    huber_loss_case_one = (torch.abs(bellman_errors) <= agent.kappa).float() * 0.5 * bellman_errors ** 2
-    huber_loss_case_two = (torch.abs(bellman_errors) > agent.kappa).float() * agent.kappa * (
-                torch.abs(bellman_errors) - 0.5 * agent.kappa)
+    huber_loss_case_one = (
+        (torch.abs(bellman_errors) <= agent.kappa).float() * 0.5 * bellman_errors ** 2
+    )
+    huber_loss_case_two = (
+        (torch.abs(bellman_errors) > agent.kappa).float()
+        * agent.kappa
+        * (torch.abs(bellman_errors) - 0.5 * agent.kappa)
+    )
     huber_loss = huber_loss_case_one + huber_loss_case_two
-    #        print("huber_loss.shape = ", huber_loss.shape)
+    # print("huber_loss.shape = ", huber_loss.shape)
 
     # Reshape replay_quantiles to batch_size x num_tau_samples x 1
-    #        replay_quantiles = torch.from_numpy(replay_quantiles).to(agent.device, dtype=torch.float32)
     replay_quantiles = torch.reshape(replay_quantiles, [agent.num_tau_samples, batch_size, 1])
-    #        print("replay_quantiles.shape = ", replay_quantiles.shape)
+    # print("replay_quantiles.shape = ", replay_quantiles.shape)
     replay_quantiles = replay_quantiles.permute([1, 0, 2])
-    #        print("replay_quantiles.shape = ", replay_quantiles.shape)
+    # print("replay_quantiles.shape = ", replay_quantiles.shape)
 
     # Tile by num_tau_prime_samples along a new dimension. Shape is now
     # batch_size x num_tau_prime_samples x num_tau_samples x 1.
     # These quantiles will be used for computation of the quantile huber loss
     # below (see section 2.3 of the paper).
-    replay_quantiles = replay_quantiles[:, None, :, :].repeat([1, agent.num_tau_prime_samples, 1, 1])
-    #        print("replay_quantiles.shape = ", replay_quantiles.shape)
+    replay_quantiles = replay_quantiles[:, None, :, :].repeat(
+        [1, agent.num_tau_prime_samples, 1, 1]
+    )
+    # print("replay_quantiles.shape = ", replay_quantiles.shape)
 
     # Shape: batch_size x num_tau_prime_samples x num_tau_samples x 1.
-    quantile_huber_loss = (torch.abs(
-        replay_quantiles - ((bellman_errors < 0).float()).detach()) * huber_loss) / agent.kappa
-    #        print("quantile_huber_loss.shape = ", quantile_huber_loss.shape)
+    quantile_huber_loss = (
+        torch.abs(replay_quantiles - ((bellman_errors < 0).float()).detach()) * huber_loss
+    ) / agent.kappa
+    # print("quantile_huber_loss.shape = ", quantile_huber_loss.shape)
 
     # Sum over current quantile value (num_tau_samples) dimension,
     # average over target quantile value (num_tau_prime_samples) dimension.
     # Shape: batch_size x num_tau_prime_samples x 1.
     loss = torch.sum(quantile_huber_loss, dim=2)
-    #        print("loss.shape = ", loss.shape)
+    # print("loss.shape = ", loss.shape)
     # Shape: batch_size x 1.
     loss = torch.mean(loss, dim=1)
-    #        print("loss.shape = ", loss.shape)
+    # print("loss.shape = ", loss.shape)
 
     # Shape: batch_size.
     loss = loss[:, 0]
-    #        print("loss.shape = ", loss.shape)
+    # print("loss.shape = ", loss.shape)
     return loss

@@ -1,7 +1,5 @@
 from collections import deque
-import random
 import atari_py
-import torch
 import math
 
 import cv2  # Note that importing cv2 before torch may cause segfaults?
@@ -9,17 +7,19 @@ import cv2  # Note that importing cv2 before torch may cause segfaults?
 import numpy as np
 
 
-class Env():
+class Env:
     def __init__(self, args):
         self.device = args.device
         self.ale = atari_py.ALEInterface()
-        self.ale.setInt('random_seed', args.seed)
-        self.ale.setInt('max_num_frames_per_episode', args.max_episode_length)
-        self.ale.setFloat('repeat_action_probability', args.proba_sticky_actions)
-        self.ale.setInt('frame_skip', 0)
-        self.ale.setBool('color_averaging', False)
-        self.ale.loadROM(atari_py.get_game_path(args.game))  # ROM loading must be done after setting options
-        actions = self.ale.getLegalActionSet() # We always use 18 actions. See revisiting ALE.
+        self.ale.setInt("random_seed", args.seed)
+        self.ale.setInt("max_num_frames_per_episode", args.max_episode_length)
+        self.ale.setFloat("repeat_action_probability", args.proba_sticky_actions)
+        self.ale.setInt("frame_skip", 0)
+        self.ale.setBool("color_averaging", False)
+        self.ale.loadROM(
+            atari_py.get_game_path(args.game)
+        )  # ROM loading must be done after setting options
+        actions = self.ale.getLegalActionSet()  # We always use 18 actions. See revisiting ALE.
         self.actions = dict([i, e] for i, e in zip(range(len(actions)), actions))
         self.window = args.history_length  # Number of frames to concatenate
         self.state_buffer = deque([], maxlen=args.history_length)
@@ -27,22 +27,27 @@ class Env():
 
         self.SABER_mode = not args.disable_SABER_mode
         if self.SABER_mode:
-            self.max_step_stuck_SABER = int(args.max_frame_stuck_SABER/self.action_repeat) # We need to divide time by action repeat to get the max_step_stuck
+            self.max_step_stuck_SABER = int(
+                args.max_frame_stuck_SABER / self.action_repeat
+            )  # We need to divide time by action repeat to get the max_step_stuck
 
-        # Reward on defender are really weird at the time we write this code (7 August 2019). All rewards are basicly mutliplied by 100 and there is always a initial reward of 10 both for no reason
+        # Reward on defender are really weird at the time we write this code (7 August 2019).
+        # All rewards are basically multiplied by 100 and there is always a initial
+        # reward of 10 both for no reason
         if args.game == "defender":
             self.handle_bug_in_defender = True
         else:
             self.handle_bug_in_defender = False
 
-
     def _get_state(self):
-        np_state_uint8 = cv2.resize(self.ale.getScreenGrayscale(), (84, 84), interpolation=cv2.INTER_LINEAR)
+        np_state_uint8 = cv2.resize(
+            self.ale.getScreenGrayscale(), (84, 84), interpolation=cv2.INTER_LINEAR
+        )
         return np_state_uint8
 
     def _reset_buffer(self):
         for _ in range(self.window):
-            self.state_buffer.append(np.zeros((84,84)))
+            self.state_buffer.append(np.zeros((84, 84)))
 
     def reset(self):
         # Reset internals
@@ -82,22 +87,28 @@ class Env():
                 self.SABER_mode_count = 0
 
             if self.SABER_mode_count > self.max_step_stuck_SABER:
-                print("We didn't receive any reward for 5 minutes, probably game stuck, let's end this episode")
+                # print(
+                #     "We didn't receive any reward for 5 minutes, probably game stuck, "
+                #     "let's end this episode"
+                # )
                 done = True
 
         # HANDLING BUG ON REWARD, particulary on defender!
         # This is specific to defender
         if self.handle_bug_in_defender:
             if reward < -1:
-                reward = 1000000 + reward # Buffer rollover
+                reward = 1000000 + reward  # Buffer rollover
             if reward < 100:
-                reward = 0 # We always got a initial reward of 10 for no reason, let's set it to 0
+                reward = 0  # We always got a initial reward of 10 for no reason, let's set it to 0
             else:
-                reward = math.ceil(reward/100)
+                reward = math.ceil(reward / 100)
 
-        #HANDLING buffer rollover (happen at least on VideoPinball, Defender and Asterix)
+        # HANDLING buffer rollover (happen at least on VideoPinball, Defender and Asterix)
         if reward < -900000:
-            print("We got a reward inferior to -900000 this is almost certainly a buffer rollover, this bug was spotten only on VideoPinball, Defender and Asterix for the moment")
+            print(
+                "We got a reward inferior to -900000 this is almost certainly a buffer rollover, "
+                "this bug was spotten only on VideoPinball, Defender and Asterix for the moment"
+            )
             reward = 1000000 + reward
 
         # Return state, reward, done
@@ -107,7 +118,7 @@ class Env():
         return len(self.actions)
 
     def render(self):
-        cv2.imshow('screen', self.ale.getScreenRGB()[:, :, ::-1])
+        cv2.imshow("screen", self.ale.getScreenRGB()[:, :, ::-1])
         cv2.waitKey(1)
 
     def close(self):

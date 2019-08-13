@@ -7,12 +7,22 @@ import CONSTANTS as CST
 
 import redlock
 
-Transition = namedtuple('Transition', ('timestep', 'state', 'action', 'reward', 'nonterminal'))
+
+Transition = namedtuple("Transition", ("timestep", "state", "action", "reward", "nonterminal"))
 blank_trans = Transition(0, np.zeros((84, 84), dtype=np.uint8), None, 0, False)
 
+
 # Segment tree data structure where parent node values are sum of children node values
-class RedisSegmentTree():
-    def __init__(self, actor_capacity, nb_actor, redis_servor, host_redis, port_redis, synchronize_actors_with_learner):
+class RedisSegmentTree:
+    def __init__(
+        self,
+        actor_capacity,
+        nb_actor,
+        redis_servor,
+        host_redis,
+        port_redis,
+        synchronize_actors_with_learner,
+    ):
         self.actor_capacity = actor_capacity
         self.nb_actor = nb_actor
         self.full_capacity = nb_actor * actor_capacity
@@ -21,7 +31,7 @@ class RedisSegmentTree():
         self.redis_servor = redis_servor
         self.synchronise_actors_with_learner = synchronize_actors_with_learner
         if self.synchronise_actors_with_learner:
-            redlock_manager = redlock.Redlock([{"host": host_redis, "port": port_redis, "db": 0}, ])
+            redlock_manager = redlock.Redlock([{"host": host_redis, "port": port_redis, "db": 0}])
             redlock_manager.retry_count = CST.RETRY_COUNT
             redlock_manager.retry_delay = CST.RETRY_DELAY
             self.redlock_manager = redlock_manager
@@ -30,24 +40,27 @@ class RedisSegmentTree():
         red_lock = False
         redlock_manager = self.redlock_manager
         while not red_lock:
-            red_lock = redlock_manager.lock(CST.NAME_REDLOCK,CST.LOCK_LIFE_LONG)
+            red_lock = redlock_manager.lock(CST.NAME_REDLOCK, CST.LOCK_LIFE_LONG)
             time.sleep(CST.RETRY_DELAY)
         return red_lock, redlock_manager
 
-    def acquire_redlock_debug(self): #ADD A CST.RETRY_COUNT ONLY FOR DEBUG, TOO SEE HOW MUCH TIME LOCK IS TRYING TO BE ACQUIRE
+    def acquire_redlock_debug(
+        self
+    ):  # ADD A CST.RETRY_COUNT ONLY FOR DEBUG, TOO SEE HOW MUCH TIME LOCK IS TRYING TO BE ACQUIRE
         red_lock = False
         retry_count = 0
         redlock_manager = self.redlock_manager
         while not red_lock:
-            red_lock = redlock_manager.lock(CST.NAME_REDLOCK,CST.LOCK_LIFE_LONG)
+            red_lock = redlock_manager.lock(CST.NAME_REDLOCK, CST.LOCK_LIFE_LONG)
             time.sleep(CST.RETRY_DELAY)
             retry_count += 1
         return red_lock, redlock_manager, retry_count
 
-    # This fonction is called once at the beginning of the training, it initialized the redis memory with all
-    # priorities to 0, the step for each actor to 0 and the step for learner to 0.
-    # The max priority is not important. We set it to 1 and is used only for the few transitions from actors that we
-    # can't compute priorities (because we reach end of the buffer and we don't get the n-next steps)
+    # This fonction is called once at the beginning of the training, it initialized the redis
+    # memory with all priorities to 0, the step for each actor to 0 and the step for learner to 0.
+    # The max priority is not important. We set it to 1 and is used only for the few transitions
+    # from actors that we can't compute priorities (because we reach end of the buffer
+    # and we don't get the n-next steps)
     def initialize_redis_database(self):
         redis_servor = self.redis_servor
         print("we flush the database! This destroy everything in redis-memory")
@@ -68,7 +81,10 @@ class RedisSegmentTree():
         pipe.set(CST.STEP_LEARNER_STR, 0)
         pipe.execute()
         end_time = time.time()
-        print("finished to initiliaze the sum_tree in redis server, time taken is %f " % (end_time - start_time))
+        print(
+            "finished to initiliaze the sum_tree in redis server, time taken is %f "
+            % (end_time - start_time)
+        )
 
     # Propagates multiple values up tree given a list of tree indexes
     def _propagate_multiple_values(self, pipe, indexes, diff_values):
@@ -79,10 +95,11 @@ class RedisSegmentTree():
                 if index != 0:
                     pipe.incrbyfloat(CST.PRIORITIES_STR + str(index), diff_value)
             indexes = (indexes - 1) // 2
-        pipe.incrbyfloat(CST.PRIORITIES_STR + str(0),
-                         np.sum(diff_values))  # Index is 0 there... we update the root of the sumtree
+        pipe.incrbyfloat(
+            CST.PRIORITIES_STR + str(0), np.sum(diff_values)
+        )  # Index is 0 there... we update the root of the sumtree
 
-    # DEBUG, we check if sumtree is correct! This is not used in the code but it's a good way to debug.
+    # We check if sumtree is correct! This is not used in the code but it's a good way to debug.
     # Sumtree nodes should be sum of child nodes
     def check_sumtree_correct(self):
         print("we check if SumTree is correct, TODO TO REMOVE")
@@ -106,7 +123,6 @@ class RedisSegmentTree():
                 print("PROBLEM WITH SUMTREE at index ", index_test)
             # assert current_test <= 1e-1  # SOMETIMES BUG WITH FLOAT CONVERSION...
             maximum = max(maximum, current_test)
-        # MAYBE THIS COULD RAISE A PROBLEM AFTER LOT OF ACCUMULATION? (maybe create a fonction to reset all value in SumTree from leafs???)
 
         end_time = time.time()
         print("SumTree correct, time used : %f " % ((end_time - start_time)))
@@ -118,17 +134,27 @@ class RedisSegmentTree():
         for idx in indeces:
             pipe.get(CST.PRIORITIES_STR + str(idx))
         b_tab_old_values = pipe.execute()
-        b_max = b_tab_old_values.pop(0)  # CARE we remove first element because we want to know the max priorities
+        b_max = b_tab_old_values.pop(
+            0
+        )  # CARE we remove first element because we want to know the max priorities
 
         self._propagate_multiple_values(pipe, indeces, priorities - np.float64(b_tab_old_values))
 
         if np.float64(max(priorities)) > np.float64(b_max):
             pipe.set(CST.MAX_PRIORITY_STR, np.float64(max(priorities)))
 
-    # This function add the actor buffer (consisting of multiple consecutive transitions) at the right location in the redis-servor
-    def append_actor_buffer(self, actor_buffer, actor_index_in_replay_memory, id_actor, priorities, T_actor):
+    # This function add the actor buffer (consisting of multiple consecutive transitions)
+    # at the right location in the redis-servor
+    def append_actor_buffer(
+        self, actor_buffer, actor_index_in_replay_memory, id_actor, priorities, T_actor
+    ):
         # print("append some data to redis servor")
-        indexes = (np.arange(actor_index_in_replay_memory, actor_index_in_replay_memory + len(actor_buffer)) % self.actor_capacity) + (id_actor * self.actor_capacity)
+        indexes = (
+            np.arange(
+                actor_index_in_replay_memory, actor_index_in_replay_memory + len(actor_buffer)
+            )
+            % self.actor_capacity
+        ) + (id_actor * self.actor_capacity)
 
         pipe = self.redis_servor.pipeline()
 
@@ -141,20 +167,29 @@ class RedisSegmentTree():
 
         for [timestep, np_state, action, reward, done] in actor_buffer:
             nonterminal = not done
-            true_index_in_replay_memory = (id_actor * self.actor_capacity) + actor_index_in_replay_memory
+            true_index_in_replay_memory = (
+                id_actor * self.actor_capacity
+            ) + actor_index_in_replay_memory
 
             str_state = np_state.ravel().tostring()
 
-            pipe.hmset(CST.TRANSITIONS_STR + str(true_index_in_replay_memory), {'timestep': timestep, 'state': str_state,
-                                                                          'action': action, 'reward': reward,
-                                                                          'nonterminal': int(nonterminal)})
+            pipe.hmset(
+                CST.TRANSITIONS_STR + str(true_index_in_replay_memory),
+                {
+                    "timestep": timestep,
+                    "state": str_state,
+                    "action": action,
+                    "reward": reward,
+                    "nonterminal": int(nonterminal),
+                },
+            )
 
             actor_index_in_replay_memory = (actor_index_in_replay_memory + 1) % self.actor_capacity
 
         pipe.set(CST.INDEX_ACTOR_STR + str(id_actor), actor_index_in_replay_memory)
         pipe.set(CST.STEP_ACTOR_STR + str(id_actor), T_actor)
         # self.data[self.index] = data  # Store data in underlying data structure
-        
+
         pipe.execute()
         if self.synchronise_actors_with_learner:
             redlock_manager.unlock(red_lock)
@@ -175,10 +210,12 @@ class RedisSegmentTree():
             # if lefts[current_indice] >= 2 * self.full_capacity - 1:
             #     indexes[current_indice] = indexes[current_indice]
             # else:
-            # This comment is useless but it explains well that if we are currently over the size, we don't want to do anything
+            # This comment is useless but it explains well that if we are currently
+            # over the size, we don't want to do anything
 
-            # This correct a bug when the tree is not a exact 2^n number, YOU DONT ITERATE same number of time for
-            # each index (think about a small example with size = 5, some index got only 1 floor of parent while other got 2...)
+            # This correct a bug when the tree is not a exact 2^n number, YOU DONT ITERATE
+            # same number of time for each index (think about a small example with size = 5,
+            # some index got only 1 floor of parent while other got 2...)
             if lefts[current_indice] < (2 * self.full_capacity - 1):
                 sum_tree_left = float(tab_b_sum_tree_left[current_indice])
                 value = values[current_indice]
@@ -190,66 +227,85 @@ class RedisSegmentTree():
 
         return self._retrieve_multiple_values(indexes, values)
 
-    # This is a function to handle not valid indexes (i.e. indexes to close from current actor_indexes, in which we can't make "good" transitions)
-    # In that case, I just push the index slightly to the left or right (to get far enough from the actor_indexes)
-    # In the original code, he was sampling over and over until he got a valid index (and in fact we almost never had to resample), but this is hard to make with multi actor each with one actor_index...
-    # We don't really care anymore about probs being equal to 0, it suppose to never happen, and if it happen sometimes, we just retry until we got all probs superior to 0..
-    # Actually I thought a lot about how to make this perfect, and I realize that this was totaly useless and didn't want to spend that much time for a case which happen almost never...
-    def transform_to_valid_tree_indexes(self, tree_indexes, tab_index_actor, history_length, n_step_length):
+    # This is a function to handle not valid indexes (i.e. indexes to close from current
+    # actor_indexes, in which we can't make "good" transitions)
+    # In that case, I just push the index slightly to the left or right (to get far
+    # enough from the actor_indexes)
+    # In the original code, he was sampling over and over until he got a valid index (and
+    # in fact we almost never had to resample), but this is hard to make with multi actor
+    # each with one actor_index...
+    # We don't really care anymore about probs being equal to 0, it suppose to never happen,
+    # and if it happen sometimes, we just retry until we got all probs superior to 0..
+    # Actually I thought a lot about how to make this perfect, and I realize that this was
+    # totaly useless and didn't want to spend that much time for a case which happen almost never.
+    def transform_to_valid_tree_indexes(
+        self, tree_indexes, tab_index_actor, history_length, n_step_length
+    ):
         data_indexes = tree_indexes - self.full_capacity + 1
 
         for ind_data_index in range(len(data_indexes)):
             data_index = data_indexes[ind_data_index]
             id_current_actor = data_index // self.actor_capacity
-            dist_to_actor_index = (data_index % self.actor_capacity) - tab_index_actor[id_current_actor]
+            dist_to_actor_index = (data_index % self.actor_capacity) - tab_index_actor[
+                id_current_actor
+            ]
 
             if dist_to_actor_index >= 0 and dist_to_actor_index <= history_length:
                 data_indexes[ind_data_index] = (
-                                                           data_index + history_length - dist_to_actor_index + 1) % self.actor_capacity + id_current_actor * self.actor_capacity
-                # print("we changed ind_data_index " + str(ind_data_index) + " old was : ", data_index)
-                # print("new is " + str(data_indexes[ind_data_index]) + " because actor id " + str(id_current_actor) + " had index too close, it was equal to : ", tab_index_actor[id_current_actor])
+                    data_index + history_length - dist_to_actor_index + 1
+                ) % self.actor_capacity + id_current_actor * self.actor_capacity
 
             elif dist_to_actor_index < 0 and dist_to_actor_index >= -n_step_length:
                 data_indexes[ind_data_index] = (
-                                                           data_index - n_step_length - dist_to_actor_index - 1) % self.actor_capacity + id_current_actor * self.actor_capacity
-                # print("we changed ind_data_index " + str(ind_data_index) + " old was : ", data_index)
-                # print("new is " + str(data_indexes[ind_data_index]) + " because actor id " + str(id_current_actor) + " had index too close, it was equal to : ", tab_index_actor[id_current_actor])
+                    data_index - n_step_length - dist_to_actor_index - 1
+                ) % self.actor_capacity + id_current_actor * self.actor_capacity
 
         return data_indexes + self.full_capacity - 1
 
     # Searches for multiple values in sum tree and returns values, data indexes and tree indexes
     def find_multiple_values(self, history_length, n_step_length, batch_size):
 
-        #red_lock, redlock_manager, retry_count = self.acquire_redlock_debug()
+        # red_lock, redlock_manager, retry_count = self.acquire_redlock_debug()
 
         if self.synchronise_actors_with_learner:
             red_lock, redlock_manager = self.acquire_redlock()
 
-        p_total = self.total()  # Retrieve sum of all priorities (used to create a normalised probability distribution)
+        p_total = (
+            self.total()
+        )  # Retrieve sum of all priorities (used to create a normalised probability distribution)
 
         segment = p_total / batch_size
 
         # Uniformly sample an element in each segment
-        samples = np.array([random.uniform(i * segment, (i + 1) * segment) for i in range(batch_size)])
+        samples = np.array(
+            [random.uniform(i * segment, (i + 1) * segment) for i in range(batch_size)]
+        )
 
-        # Every day I'm shuffling! The idea is to get shuffled indexes from redis memory, like that we can get many batch at the same time without any bias...
+        # Every day I'm shuffling! The idea is to get shuffled indexes from redis memory,
+        # like that we can get many batch at the same time without any bias...
         np.random.shuffle(samples)
 
-        samples_copy = samples.copy() # I remember it was to keep samples for debugging, maybe it's not usefull but it's totally free in computation so let's keep it... 28/11/2018
+        samples_copy = (
+            samples.copy()
+        )  # I remember it was to keep samples for debugging, maybe it's not usefull
+        # but it's totally free in computation so let's keep it... 28/11/2018
 
-        tree_indexes = self._retrieve_multiple_values(np.zeros(len(samples), dtype=int),
-                                                      samples_copy)  # Search for index of item from root
+        tree_indexes = self._retrieve_multiple_values(
+            np.zeros(len(samples), dtype=int), samples_copy
+        )  # Search for index of item from root
 
         pipe = self.redis_servor.pipeline()
 
-        # We handle index to close from any actor_index by pushing it slightly away from this actor_index (it should be far away by self.history and self.n to get valid transitions)
+        # We handle index to close from any actor_index by pushing it slightly away from this
+        # actor_index (it should be far away by self.history and self.n to get valid transitions)
         for actor_id in range(self.nb_actor):
             pipe.get(CST.INDEX_ACTOR_STR + str(actor_id))
         tab_b_index_actor = pipe.execute()
         tab_index_actor = np.array([int(b_index_actor) for b_index_actor in tab_b_index_actor])
 
-        tree_indexes = self.transform_to_valid_tree_indexes(tree_indexes, tab_index_actor, history_length,
-                                                            n_step_length)
+        tree_indexes = self.transform_to_valid_tree_indexes(
+            tree_indexes, tab_index_actor, history_length, n_step_length
+        )
 
         data_indexes = tree_indexes - self.full_capacity + 1
 
@@ -259,13 +315,20 @@ class RedisSegmentTree():
             pipe.get(CST.PRIORITIES_STR + str(tree_index))
 
         tab_b_value_priorities = pipe.execute()
-        tab_value_priorities = np.array([float(b_value_priority) for b_value_priority in tab_b_value_priorities])
+        tab_value_priorities = np.array(
+            [float(b_value_priority) for b_value_priority in tab_b_value_priorities]
+        )
 
         if self.synchronise_actors_with_learner:
             redlock_manager.unlock(red_lock)
         # print("retry_count find_multiple_values = ", retry_count)
 
-        return tab_value_priorities, data_indexes, tree_indexes, p_total  # Return value, data index, tree index
+        return (
+            tab_value_priorities,
+            data_indexes,
+            tree_indexes,
+            p_total,
+        )  # Return value, data index, tree index
 
     def total(self):
         b_sum_tree_total = self.redis_servor.get(CST.PRIORITIES_STR + str(0))
@@ -275,24 +338,35 @@ class RedisSegmentTree():
 
     def _byte_data_to_transition(self, b_data):
         [b_timestep, str_state, b_action, b_reward, b_nonterminal] = b_data
-        if str_state == None:
+        if str_state is None:
             return None  # We are getting a transition not filled yet...
         np_state = np.frombuffer(str_state, dtype=np.uint8).reshape(84, 84)
-        transition = Transition(int(b_timestep), np_state, int(b_action), float(b_reward), bool(int(b_nonterminal)))
+        transition = Transition(
+            int(b_timestep), np_state, int(b_action), float(b_reward), bool(int(b_nonterminal))
+        )
         return transition
 
     def get_byte_multiple_transition(self, tab_indeces, history_length, n_step_length):
-        length_transitions = (history_length + n_step_length)  # How much states in each transitions
-        number_transitions = len(
-            tab_indeces)  # Suppose to be equal to batchsize, how much transitions we want to sample...
-        tab_transitions = []
+        length_transitions = history_length + n_step_length  # How much states in each transitions
         pipe = self.redis_servor.pipeline()
         for index in tab_indeces:
             id_current_actor = index // self.actor_capacity
             for index_current_transition in range(length_transitions):
-                pipe.hmget(CST.TRANSITIONS_STR + str(((
-                                                            index_current_transition + index - history_length + 1) % self.actor_capacity) + id_current_actor * self.actor_capacity),
-                           'timestep', 'state', 'action', 'reward', 'nonterminal')
+                pipe.hmget(
+                    CST.TRANSITIONS_STR
+                    + str(
+                        (
+                            (index_current_transition + index - history_length + 1)
+                            % self.actor_capacity
+                        )
+                        + id_current_actor * self.actor_capacity
+                    ),
+                    "timestep",
+                    "state",
+                    "action",
+                    "reward",
+                    "nonterminal",
+                )
 
         return pipe.execute()
 
@@ -319,19 +393,27 @@ class RedisSegmentTree():
         return capacity
 
 
-class ReplayRedisMemory():
+class ReplayRedisMemory:
     def __init__(self, args, redis_servor):
         self.device = args.device
         self.capacity = args.actor_capacity * args.nb_actor
         self.history = args.history_length
         self.discount = args.discount
         self.n = args.multi_step
-        self.priority_weight = args.priority_weight  # Initial importance sampling weight β, annealed to 1 over course of training
+        self.priority_weight = (
+            args.priority_weight
+        )  # Initial importance sampling weight β, annealed to 1 over course of training
         self.priority_exponent = args.priority_exponent
         self.t = 0  # Internal episode timestep counter
-        self.transitions = RedisSegmentTree(args.actor_capacity, args.nb_actor,
-                                            redis_servor, args.host_redis, args.port_redis,
-                                            args.synchronize_actors_with_learner)  # Store transitions in a wrap-around cyclic buffer within a sum tree for querying priorities
+        self.transitions = RedisSegmentTree(
+            args.actor_capacity,
+            args.nb_actor,
+            redis_servor,
+            args.host_redis,
+            args.port_redis,
+            args.synchronize_actors_with_learner,
+        )
+        # Store transition in a wrap-around cyclic buffer within a sum tree for querying priorities
 
     # DEBUG, we check if 2 transition are the same
     def _check_equality_transitions(self, old_transition, new_transition):
@@ -341,33 +423,42 @@ class ReplayRedisMemory():
         assert old_transition.reward == new_transition.reward
         assert old_transition.nonterminal == new_transition.nonterminal
 
-    # Returns a valid sample from all segments in form of byte (to be added easely to the redis-servor)
+    # Returns a valid sample from all segments in form of byte (to be added to the redis-servor)
     def _get_byte_sample_from_all_segment(self, batch_size):
         # start_time_test = time.time()
 
-        tab_probs, data_indexes, tree_indexes, p_total = self.transitions.find_multiple_values(self.history, self.n, batch_size)  # Retrieve sample from tree with un-normalised probability
+        tab_probs, data_indexes, tree_indexes, p_total = self.transitions.find_multiple_values(
+            self.history, self.n, batch_size
+        )  # Retrieve sample from tree with un-normalised probability
 
         while np.min(tab_probs) <= 0:
-            print("This is a weird bug happening sometimes that I can't succeed to understand... Let's just find_multiple_values again...")
-            tab_probs, data_indexes, tree_indexes, p_total = self.transitions.find_multiple_values(self.history, self.n,
-                                                                                                   batch_size)
+            print(
+                "This is a weird bug happening sometimes that I can't succeed "
+                "to understand... Let's just find_multiple_values again..."
+            )
+            tab_probs, data_indexes, tree_indexes, p_total = self.transitions.find_multiple_values(
+                self.history, self.n, batch_size
+            )
 
         # duration_test = time.time() - start_time_test
         # print('Time in find_multiple_values = (%.3f sec)' % (duration_test))
         # start_time_test = time.time()
 
-        tab_byte_transition = self.transitions.get_byte_multiple_transition(data_indexes, self.history, self.n)
+        tab_byte_transition = self.transitions.get_byte_multiple_transition(
+            data_indexes, self.history, self.n
+        )
 
         return tab_probs, data_indexes, tree_indexes, tab_byte_transition, p_total
 
-    # Returns a valid sample from all segments in form of byte (to be added easely to the redis-servor)
+    # Returns a valid sample from all segments in form of byte (to be added to the redis-servor)
     def sample_byte(self, batch_size):
-
-        probs, idxs, tree_idxs, tab_byte_transition, p_total = self._get_byte_sample_from_all_segment(batch_size)
-
+        byte_sample = self._get_byte_sample_from_all_segment(batch_size)
+        probs, idxs, tree_idxs, tab_byte_transition, p_total = byte_sample
         probs = probs / p_total  # Calculate normalised probabilities
         capacity = self.transitions.get_current_capacity()
-        weights = (capacity * probs) ** -self.priority_weight  # Compute importance-sampling weights w
+        weights = (
+            capacity * probs
+        ) ** -self.priority_weight  # Compute importance-sampling weights w
         weights = weights / weights.max()  # Normalise by max importance-sampling weight from batch
 
         # if np.min(probs) <= 0:
@@ -387,7 +478,8 @@ class ReplayRedisMemory():
             current_transitions = [None] * length_transitions
             for ind_b_transition in range(length_transitions):
                 current_transitions[ind_b_transition] = self.transitions._byte_data_to_transition(
-                    tab_byte_transition[(num_transitions * length_transitions) + ind_b_transition])
+                    tab_byte_transition[(num_transitions * length_transitions) + ind_b_transition]
+                )
             tab_transitions.append(current_transitions)
 
         for transitions in tab_transitions:
@@ -408,10 +500,14 @@ class ReplayRedisMemory():
         for transition in tab_transitions:
             state = np.stack([trans.state for trans in transition[:history_length]])
             next_state = np.stack(
-                [trans.state for trans in transition[self.n:self.n + self.history]])
+                [trans.state for trans in transition[self.n: self.n + self.history]]
+            )
 
-            # Calculate truncated n-step discounted return R^n = Σ_k=0->n-1 (γ^k)R_t+k+1 (note that invalid nth next states have reward 0)
-            reward = sum(self.discount ** n * transition[self.history + n - 1].reward for n in range(self.n))
+            # Calculate truncated n-step discounted return R^n = Σ_k=0->n-1
+            # (γ^k)R_t+k+1 (note that invalid nth next states have reward 0)
+            reward = sum(
+                self.discount ** n * transition[self.history + n - 1].reward for n in range(self.n)
+            )
             # Mask for non-terminal nth next states
 
             tab_state.append(state)
@@ -420,8 +516,16 @@ class ReplayRedisMemory():
             tab_next_state.append(next_state)
             tab_nonterminal.append(transition[self.history + self.n - 1].nonterminal)
 
-        states = torch.from_numpy(np.stack(tab_state)).to(dtype=torch.float32, device=self.device).div_(255)
-        next_states = torch.from_numpy(np.stack(tab_next_state)).to(dtype=torch.float32, device=self.device).div_(255)
+        states = (
+            torch.from_numpy(np.stack(tab_state))
+            .to(dtype=torch.float32, device=self.device)
+            .div_(255)
+        )
+        next_states = (
+            torch.from_numpy(np.stack(tab_next_state))
+            .to(dtype=torch.float32, device=self.device)
+            .div_(255)
+        )
         actions = torch.tensor(tab_action, dtype=torch.int64, device=self.device)
         returns = torch.tensor(tab_reward, dtype=torch.float32, device=self.device)
         nonterminals = torch.tensor(tab_nonterminal, dtype=torch.float32, device=self.device)
@@ -434,8 +538,8 @@ class ReplayRedisMemory():
         tree_idxs, tab_byte_transition, weights = mp_queue.get()
         assert len(tree_idxs) == len(weights)
         batch_size = len(tree_idxs)
-
-        states, actions, returns, next_states, nonterminals = self.get_torch_tensor_from_byte_transition(tab_byte_transition, batch_size)
+        torch_tensors = self.get_torch_tensor_from_byte_transition(tab_byte_transition, batch_size)
+        states, actions, returns, next_states, nonterminals = torch_tensors
 
         weights = torch.tensor(weights, dtype=torch.float32, device=self.device)
 

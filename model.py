@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-import numpy as np
+
 # Factorised NoisyLinear layer with bias
 class NoisyLinear(nn.Module):
     def __init__(self, in_features, out_features, std_init, disable_cuda=False):
@@ -14,10 +14,10 @@ class NoisyLinear(nn.Module):
         self.std_init = std_init
         self.weight_mu = nn.Parameter(torch.empty(out_features, in_features))
         self.weight_sigma = nn.Parameter(torch.empty(out_features, in_features))
-        self.register_buffer('weight_epsilon', torch.empty(out_features, in_features))
+        self.register_buffer("weight_epsilon", torch.empty(out_features, in_features))
         self.bias_mu = nn.Parameter(torch.empty(out_features))
         self.bias_sigma = nn.Parameter(torch.empty(out_features))
-        self.register_buffer('bias_epsilon', torch.empty(out_features))
+        self.register_buffer("bias_epsilon", torch.empty(out_features))
         self.reset_parameters()
         self.reset_noise()
 
@@ -38,13 +38,16 @@ class NoisyLinear(nn.Module):
     def reset_noise(self):
         epsilon_in = self._scale_noise(self.in_features)
         epsilon_out = self._scale_noise(self.out_features)
-        self.weight_epsilon = (epsilon_out.ger(epsilon_in))
-        self.bias_epsilon = (epsilon_out)
+        self.weight_epsilon = epsilon_out.ger(epsilon_in)
+        self.bias_epsilon = epsilon_out
 
     def forward(self, input):
         if self.training:
-            return F.linear(input, self.weight_mu + self.weight_sigma * self.weight_epsilon,
-                            self.bias_mu + self.bias_sigma * self.bias_epsilon)
+            return F.linear(
+                input,
+                self.weight_mu + self.weight_sigma * self.weight_epsilon,
+                self.bias_mu + self.bias_sigma * self.bias_epsilon,
+            )
         else:
             return F.linear(input, self.weight_mu, self.bias_mu)
 
@@ -62,23 +65,48 @@ class DQN(nn.Module):
         self.conv2 = nn.Conv2d(32, 64, 4, stride=2)
         self.conv3 = nn.Conv2d(64, 64, 3)
 
-        if self.rainbow_only: # Model is different if using Rainbow only or using Rainbow IQN
+        if self.rainbow_only:  # Model is different if using Rainbow only or using Rainbow IQN
             self.atoms = args.atoms
-            # Care we are looking for substring "fcnoisy" in the name to detect which layer are noisy layer!!!
-            self.fcnoisy_h_v = NoisyLinear(3136, args.hidden_size, std_init=args.noisy_std, disable_cuda=args.disable_cuda)
-            self.fcnoisy_h_a = NoisyLinear(3136, args.hidden_size, std_init=args.noisy_std, disable_cuda=args.disable_cuda)
-            self.fcnoisy_z_v = NoisyLinear(args.hidden_size, self.atoms, std_init=args.noisy_std, disable_cuda=args.disable_cuda)
-            self.fcnoisy_z_a = NoisyLinear(args.hidden_size, action_space * self.atoms, std_init=args.noisy_std, disable_cuda=args.disable_cuda)
+            # We are looking for substring "fcnoisy" in name to detect which layer are noisy layer!
+            self.fcnoisy_h_v = NoisyLinear(
+                3136, args.hidden_size, std_init=args.noisy_std, disable_cuda=args.disable_cuda
+            )
+            self.fcnoisy_h_a = NoisyLinear(
+                3136, args.hidden_size, std_init=args.noisy_std, disable_cuda=args.disable_cuda
+            )
+            self.fcnoisy_z_v = NoisyLinear(
+                args.hidden_size,
+                self.atoms,
+                std_init=args.noisy_std,
+                disable_cuda=args.disable_cuda,
+            )
+            self.fcnoisy_z_a = NoisyLinear(
+                args.hidden_size,
+                action_space * self.atoms,
+                std_init=args.noisy_std,
+                disable_cuda=args.disable_cuda,
+            )
 
-        else: # Rainbow-IQN model
+        else:  # Rainbow-IQN model
             self.quantile_embedding_dim = args.quantile_embedding_dim
             self.iqn_fc = nn.Linear(self.quantile_embedding_dim, 3136)
 
-            # Care we are looking for substring "fcnoisy" in the name to detect which layer are noisy layer!!!
-            self.fcnoisy_h_v = NoisyLinear(3136, args.hidden_size, std_init=args.noisy_std, disable_cuda=args.disable_cuda)
-            self.fcnoisy_h_a = NoisyLinear(3136, args.hidden_size, std_init=args.noisy_std, disable_cuda=args.disable_cuda)
-            self.fcnoisy_z_v = NoisyLinear(args.hidden_size, 1, std_init=args.noisy_std, disable_cuda=args.disable_cuda)
-            self.fcnoisy_z_a = NoisyLinear(args.hidden_size, action_space, std_init=args.noisy_std, disable_cuda=args.disable_cuda)
+            # We are looking for substring "fcnoisy" in name to detect which layer are noisy layer!
+            self.fcnoisy_h_v = NoisyLinear(
+                3136, args.hidden_size, std_init=args.noisy_std, disable_cuda=args.disable_cuda
+            )
+            self.fcnoisy_h_a = NoisyLinear(
+                3136, args.hidden_size, std_init=args.noisy_std, disable_cuda=args.disable_cuda
+            )
+            self.fcnoisy_z_v = NoisyLinear(
+                args.hidden_size, 1, std_init=args.noisy_std, disable_cuda=args.disable_cuda
+            )
+            self.fcnoisy_z_a = NoisyLinear(
+                args.hidden_size,
+                action_space,
+                std_init=args.noisy_std,
+                disable_cuda=args.disable_cuda,
+            )
 
     def forward(self, x, num_quantiles=None, log=False):
         batch_size = x.shape[0]
@@ -107,8 +135,12 @@ class DQN(nn.Module):
             quantile_net = quantiles.repeat([1, self.quantile_embedding_dim])
 
             quantile_net = torch.cos(
-                torch.arange(1, self.quantile_embedding_dim + 1, 1, device=self.device,
-                             dtype=torch.float32) * math.pi * quantile_net)
+                torch.arange(
+                    1, self.quantile_embedding_dim + 1, 1, device=self.device, dtype=torch.float32
+                )
+                * math.pi
+                * quantile_net
+            )
 
             quantile_net = self.iqn_fc(quantile_net)
             quantile_net = F.relu(quantile_net)
@@ -118,7 +150,6 @@ class DQN(nn.Module):
 
             x = x * quantile_net
             # print("x.shape after multiply = ", x.shape)
-
 
             v = self.fcnoisy_z_v(F.relu(self.fcnoisy_h_v(x)))  # Value stream
             a = self.fcnoisy_z_a(F.relu(self.fcnoisy_h_a(x)))  # Advantage stream
@@ -130,5 +161,5 @@ class DQN(nn.Module):
 
     def reset_noise(self):
         for name, module in self.named_children():
-            if 'fcnoisy' in name:
+            if "fcnoisy" in name:
                 module.reset_noise()

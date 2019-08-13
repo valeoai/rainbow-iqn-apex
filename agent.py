@@ -13,7 +13,7 @@ import CONSTANTS as CST
 import compute_loss_iqn
 
 
-class Agent():  # This class handle both actor and learner because most of their methods are shared
+class Agent:  # This class handle both actor and learner because most of their methods are shared
     def __init__(self, args, action_space, redis_servor):
         self.action_space = action_space
 
@@ -30,7 +30,7 @@ class Agent():  # This class handle both actor and learner because most of their
         if args.model:
             if os.path.isfile(args.model):
                 # Always load tensors onto CPU by default, will shift to GPU if necessary
-                self.online_net.load_state_dict(torch.load(args.model, map_location='cpu'))
+                self.online_net.load_state_dict(torch.load(args.model, map_location="cpu"))
                 print("We loaded model ", args.model)
             else:
                 print("We didn't fint the model you gave as input!")
@@ -52,7 +52,8 @@ class Agent():  # This class handle both actor and learner because most of their
             self.Vmin = args.V_min
             self.Vmax = args.V_max
             self.support = torch.linspace(args.V_min, args.V_max, self.atoms).to(
-                device=args.device)  # Support (range) of z
+                device=args.device
+            )  # Support (range) of z
             self.delta_z = (args.V_max - args.V_min) / (self.atoms - 1)
         else:  # Rainbow-IQN
             self.kappa = args.kappa
@@ -66,8 +67,9 @@ class Agent():  # This class handle both actor and learner because most of their
 
     # Acts based on single state (no batch)
     def act(self, state_buffer):
-        state = torch.from_numpy(np.stack(state_buffer).astype(np.float32) /
-                                 255).to(self.device, dtype=torch.float32)
+        state = torch.from_numpy(np.stack(state_buffer).astype(np.float32) / 255).to(
+            self.device, dtype=torch.float32
+        )
         if self.rainbow_only:
             with torch.no_grad():
                 return (self.online_net(state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
@@ -112,8 +114,10 @@ class Agent():  # This class handle both actor and learner because most of their
                 # Compute Tz (Bellman operator T applied to z)
 
                 Tz = returns.unsqueeze(1) + nonterminals.unsqueeze(1) * (
-                            self.discount ** self.n) * self.support.unsqueeze(
-                    0)  # Tz = R^n + (γ^n)z (accounting for terminal states)
+                    self.discount ** self.n
+                ) * self.support.unsqueeze(
+                    0
+                )  # Tz = R^n + (γ^n)z (accounting for terminal states)
                 Tz = Tz.clamp(min=self.Vmin, max=self.Vmax)  # Clamp between supported values
                 # Compute L2 projection of Tz onto fixed support z
                 b = (Tz - self.Vmin) / self.delta_z  # b = (Tz - Vmin) / Δz
@@ -124,14 +128,16 @@ class Agent():  # This class handle both actor and learner because most of their
 
                 # Distribute probability of Tz
                 m = states.new_zeros(batch_size, self.atoms)
-                offset = torch.linspace(0, ((batch_size - 1) * self.atoms), batch_size).unsqueeze(
-                    1).expand(batch_size, self.atoms).to(actions)
+                offset = (
+                    torch.linspace(0, ((batch_size - 1) * self.atoms), batch_size)
+                    .unsqueeze(1)
+                    .expand(batch_size, self.atoms)
+                    .to(actions)
+                )
                 # m_l = m_l + p(s_t+n, a*)(u - b)
-                m.view(-1).index_add_(0, (l + offset).view(-1),
-                                      (pns_a * (u.float() - b)).view(-1))
+                m.view(-1).index_add_(0, (l + offset).view(-1), (pns_a * (u.float() - b)).view(-1))
                 # m_u = m_u + p(s_t+n, a*)(b - l)
-                m.view(-1).index_add_(0, (u + offset).view(-1),
-                                      (pns_a * (b - l.float())).view(-1))
+                m.view(-1).index_add_(0, (u + offset).view(-1), (pns_a * (b - l.float())).view(-1))
 
                 ##################################################
                 # Compute target quantile values, so no gradient #
@@ -142,7 +148,8 @@ class Agent():  # This class handle both actor and learner because most of their
 
         else:  # IQN loss
             loss = compute_loss_iqn.compute_loss_actor_or_learner_iqn(
-                self, states, actions, returns, next_states, nonterminals)
+                self, states, actions, returns, next_states, nonterminals
+            )
         return loss
 
     ########################
@@ -151,11 +158,11 @@ class Agent():  # This class handle both actor and learner because most of their
 
     def learn(self, mem_redis, mp_queue):
         # Sample transitions
-        idxs, states, actions, returns, next_states, nonterminals, weights\
-            = mem_redis.get_sample_from_mp_queue(mp_queue)
-
-        loss = self.compute_loss_actor_or_learner(states, actions,
-                                                  returns, next_states, nonterminals)
+        sample = mem_redis.get_sample_from_mp_queue(mp_queue)
+        idxs, states, actions, returns, next_states, nonterminals, weights = sample
+        loss = self.compute_loss_actor_or_learner(
+            states, actions, returns, next_states, nonterminals
+        )
 
         self.online_net.zero_grad()
         (weights * loss).mean().backward()  # Importance weight losses
@@ -168,8 +175,14 @@ class Agent():  # This class handle both actor and learner because most of their
         # return idxs, priorities
 
     # Acts with an ε-greedy policy (used for evaluation only in test_multiple_seed.py)
-    def act_e_greedy(self, state_buffer, epsilon=0.001):  # High ε can reduce eval score drastically
-        return random.randrange(self.action_space) if random.random() < epsilon else self.act(state_buffer)
+    def act_e_greedy(
+        self, state_buffer, epsilon=0.001
+    ):  # High ε can reduce eval score drastically
+        return (
+            random.randrange(self.action_space)
+            if random.random() < epsilon
+            else self.act(state_buffer)
+        )
 
     # Save model parameters on current device (don't move model between devices)
     def save(self, path, name):
@@ -207,62 +220,92 @@ class Agent():  # This class handle both actor and learner because most of their
         #     assert int(torch.min(itemsbefore[ind_item][1] == itemsafter[ind_item][1])) == 1
 
     ########################
-    ### ONLY FOR LEARNER ###
+    #   ONLY FOR LEARNER   #
     ########################
 
     ######################
-    ### ONLY FOR ACTOR ###
+    #   ONLY FOR ACTOR   #
     ######################
 
     # Load weight from redis database
     def load_weight_from_redis(self):
         load_bytesIO = io.BytesIO(self.redis_servor.get(CST.MODEL_WEIGHT_STR))
-        self.online_net.load_state_dict(torch.load(load_bytesIO, map_location='cpu'))
+        self.online_net.load_state_dict(torch.load(load_bytesIO, map_location="cpu"))
 
     # Compute priorities before sending experience to redis replay
-    # SOMETHING TO KEEP IN MIND, THE RETURNS CAN BE WRONG NEAR TERMINAL STATE AND IF REWARD AT BEGINNING OF EPISODE ARE NOT ZERO... (should we care?)
-    # In fact the states and next_states too are wrong near terminal state... it's kinda hard to take care of this properly, so we just initiliaze priorities pretty badly around terminal state...
-    def compute_priorities(self, tab_state, tab_action, tab_reward, tab_nonterminal, priority_exponent):
-        # REMINDER INDICE IN tab_state goes from -3 to len_buffer, the idea is that we got 3 more states because we stack 4 states before sending it to network
+    # SOMETHING TO KEEP IN MIND, THE RETURNS CAN BE WRONG NEAR TERMINAL STATE AND
+    # IF REWARD AT BEGINNING OF EPISODE ARE NOT ZERO... (should we care?)
+    # In fact the states and next_states are also wrong near terminal state... it's kinda hard to
+    # take care of this properly, so we just initialize priorities badly around terminal state...
+    def compute_priorities(
+        self, tab_state, tab_action, tab_reward, tab_nonterminal, priority_exponent
+    ):
+        # REMINDER INDICE IN tab_state goes from -3 to len_buffer, the idea is that we got 3 more
+        # states because we stack 4 states before sending it to network
         len_buffer = len(tab_action)
-        assert len(tab_action) == len(tab_reward) == len(tab_nonterminal) == len(tab_state) - self.history + 1
+        assert (
+            len(tab_action)
+            == len(tab_reward)
+            == len(tab_nonterminal)
+            == len(tab_state) - self.history + 1
+        )
 
         tab_nonterminal = np.float32(tab_nonterminal[self.n:])
 
-        # Handling the case near a terminal state, indeed by construction the n-step states before this terminal state
-        # are considered as terminal too (we want to know if in n-step the episode will be already ended or not)
+        # Handling the case near a terminal state, indeed by construction the n-step states before
+        # this terminal state are considered as terminal too (we want to know if in n-step the
+        # episode will be already ended or not)
         current_term_indices = np.where(tab_nonterminal == 0)[0]
         for indice in current_term_indices:
-            tab_nonterminal[indice+1:(indice + self.n + 1)] = 0
+            tab_nonterminal[indice + 1: (indice + self.n + 1)] = 0
 
-        actions = torch.tensor(tab_action[:len_buffer - self.n], dtype=torch.int64, device=self.device)
-        tab_returns = [sum(self.discount ** n * tab_reward[n + indice] for n in range(self.n)) for indice in range(0, len_buffer - self.n)]
+        actions = torch.tensor(
+            tab_action[: len_buffer - self.n], dtype=torch.int64, device=self.device
+        )
+        tab_returns = [
+            sum(self.discount ** n * tab_reward[n + indice] for n in range(self.n))
+            for indice in range(0, len_buffer - self.n)
+        ]
         returns = torch.tensor(tab_returns, dtype=torch.float32, device=self.device)
         nonterminals = torch.tensor(tab_nonterminal, dtype=torch.float32, device=self.device)
 
         tab_priorities = []
-        for indice in range(math.ceil(len(actions)/self.batch_size)):
+        for indice in range(math.ceil(len(actions) / self.batch_size)):
             current_begin = indice * self.batch_size
-            current_end = min((indice+1) * self.batch_size, len(actions))
+            current_end = min((indice + 1) * self.batch_size, len(actions))
 
             tab_current_state = []
             tab_current_next_state = []
 
             for current_sub_indice in range(current_begin, current_end):
-                state = np.stack(tab_state[current_sub_indice:current_sub_indice+self.history])
-                next_state = np.stack(tab_state[current_sub_indice+self.n:current_sub_indice + self.history + self.n])
+                state = np.stack(tab_state[current_sub_indice: current_sub_indice + self.history])
+                next_state = np.stack(
+                    tab_state[
+                        current_sub_indice + self.n: current_sub_indice + self.history + self.n
+                    ]
+                )
 
                 tab_current_state.append(state)
                 tab_current_next_state.append(next_state)
 
-            states = torch.from_numpy(np.stack(tab_current_state)).to(dtype=torch.float32, device=self.device).div_(255)
-            next_states = torch.from_numpy(np.stack(tab_current_next_state)).to(dtype=torch.float32, device=self.device).div_(255)
+            states = (
+                torch.from_numpy(np.stack(tab_current_state))
+                .to(dtype=torch.float32, device=self.device)
+                .div_(255)
+            )
+            next_states = (
+                torch.from_numpy(np.stack(tab_current_next_state))
+                .to(dtype=torch.float32, device=self.device)
+                .div_(255)
+            )
 
-            loss = self.compute_loss_actor_or_learner(states,
-                                                      actions[current_begin:current_end],
-                                                      returns[current_begin:current_end],
-                                                      next_states,
-                                                      nonterminals[current_begin:current_end])
+            loss = self.compute_loss_actor_or_learner(
+                states,
+                actions[current_begin:current_end],
+                returns[current_begin:current_end],
+                next_states,
+                nonterminals[current_begin:current_end],
+            )
 
             current_priorities = loss.detach().cpu().numpy()
             tab_priorities.append(current_priorities)
@@ -271,6 +314,5 @@ class Agent():  # This class handle both actor and learner because most of their
         return np.power(priorities, priority_exponent)
 
     ######################
-    ### ONLY FOR ACTOR ###
+    #   ONLY FOR ACTOR   #
     ######################
-

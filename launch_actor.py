@@ -24,15 +24,20 @@ import random
 
 import os
 
+
 # Simple ISO 8601 timestamped logger
 def log(s):
-    print('[' + str(datetime.now().strftime('%Y-%m-%dT%H:%M:%S')) + '] ' + s)
+    print("[" + str(datetime.now().strftime("%Y-%m-%dT%H:%M:%S")) + "] " + s)
 
 
 # Send actor buffer experience to main memory
-def send_actor_buffer(actor_buffer, actor_index_in_replay_memory, id_actor,
-                      mem_actor, priorities, T_actor):  # actor_index_in_replay_memory is the index in the memory where to start appending the next data
-    mem_actor.transitions.append_actor_buffer(actor_buffer, actor_index_in_replay_memory, id_actor, priorities, T_actor)
+def send_actor_buffer(
+    actor_buffer, actor_index_in_replay_memory, id_actor, mem_actor, priorities, T_actor
+):  # actor_index_in_replay_memory is the index in the memory where to start appending next buffer
+    mem_actor.transitions.append_actor_buffer(
+        actor_buffer, actor_index_in_replay_memory, id_actor, priorities, T_actor
+    )
+
 
 # Create an actor instance
 def launch_actor(id_actor, args, redis_servor):
@@ -43,13 +48,17 @@ def launch_actor(id_actor, args, redis_servor):
     start_time_actor = time.time()
 
     if args.continue_experiment:
-        print("We are restarting a stopped experience with a model trained for "+str(args.step_already_done) + "steps")
+        print(
+            "We are restarting a stopped experience with a model trained for "
+            + str(args.step_already_done)
+            + "steps"
+        )
         initial_T_actor = int((args.step_already_done - args.memory_capacity) / args.nb_actor)
         print("initial T actor equal ", initial_T_actor)
-        step_to_start_sleep = int(args.step_already_done/ args.nb_actor)
+        step_to_start_sleep = int(args.step_already_done / args.nb_actor)
     else:
         initial_T_actor = 0
-        step_to_start_sleep = int(args.learn_start/args.nb_actor)
+        step_to_start_sleep = int(args.learn_start / args.nb_actor)
     T_actor = initial_T_actor
 
     index_actor_in_memory = 0
@@ -67,27 +76,44 @@ def launch_actor(id_actor, args, redis_servor):
 
     if id_actor == 0:
         # Variables for plot and dump in csv only
-        Tab_T_actors, Tab_T_learner, Tab_length_episode, Tab_longest_episode, tab_rewards_plot, best_avg_reward = [], [], [], [], [], -1e10
-        
-        # We initialize all buffer with 0 because sometimes there are not totally filled for the first evaluation step and this leads to a bug in the plot...
-        total_reward_buffer_SABER = deque([0] * args.evaluation_episodes, maxlen=args.evaluation_episodes)
-        total_reward_buffer_30min = deque([0] * args.evaluation_episodes, maxlen=args.evaluation_episodes)
-        total_reward_buffer_5min = deque([0] * args.evaluation_episodes, maxlen=args.evaluation_episodes)
-        episode_length_buffer = deque([0] * args.evaluation_episodes, maxlen=args.evaluation_episodes)
+        Tab_T_actors, Tab_T_learner, Tab_length_episode, Tab_longest_episode = ([], [], [], [])
+        tab_rewards_plot, best_avg_reward = [], -1e10
+
+        # We initialize all buffer with 0 because sometimes there are not totally
+        # filled for the first evaluation step and this leads to a bug in the plot...
+        total_reward_buffer_SABER = deque(
+            [0] * args.evaluation_episodes, maxlen=args.evaluation_episodes
+        )
+        total_reward_buffer_30min = deque(
+            [0] * args.evaluation_episodes, maxlen=args.evaluation_episodes
+        )
+        total_reward_buffer_5min = deque(
+            [0] * args.evaluation_episodes, maxlen=args.evaluation_episodes
+        )
+        episode_length_buffer = deque(
+            [0] * args.evaluation_episodes, maxlen=args.evaluation_episodes
+        )
         current_total_reward_SABER = 0
         current_total_reward_30min = 0
         current_total_reward_5min = 0
 
-    while T_actor < (args.T_max/args.nb_actor):
+    while T_actor < (args.T_max / args.nb_actor):
         if done_actor:
+            timestep = 0
+            state_buffer_actor = env_actor.reset()
+            done_actor = False
             if id_actor == 0 and T_actor > initial_T_actor:
                 total_reward_buffer_SABER.append(current_total_reward_SABER)
 
-                if timestep < (5 * 60 * 60)/args.action_repeat: # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
+                if (
+                    timestep < (5 * 60 * 60) / args.action_repeat
+                ):  # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
                     current_total_reward_5min = current_total_reward_SABER
                 total_reward_buffer_5min.append(current_total_reward_5min)
 
-                if timestep < (30 * 60 * 60)/args.action_repeat: # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
+                if (
+                    timestep < (30 * 60 * 60) / args.action_repeat
+                ):  # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
                     current_total_reward_30min = current_total_reward_SABER
                 total_reward_buffer_30min.append(current_total_reward_30min)
 
@@ -95,27 +121,32 @@ def launch_actor(id_actor, args, redis_servor):
                 current_total_reward_SABER = 0
                 current_total_reward_30min = 0
                 current_total_reward_5min = 0
-            timestep = 0
-            state_buffer_actor = env_actor.reset()
-            done_actor = False
 
         if T_actor % args.replay_frequency == 0:
             actor.reset_noise()  # Draw a new set of noisy weights
 
-        if T_actor < args.learn_start/args.nb_actor:
+        if T_actor < args.learn_start / args.nb_actor:
             action = random.randint(0, env_actor.action_space() - 1)
         else:
-            action = actor.act(state_buffer_actor)  # Choose an action greedily (with noisy weights)
+            action = actor.act(
+                state_buffer_actor
+            )  # Choose an action greedily (with noisy weights)
 
         next_state_buffer_actor, reward, done_actor = env_actor.step(action)  # Step
         if args.render and id_actor == 0:
             env_actor.render()
 
         if id_actor == 0:
-            current_total_reward_SABER += reward #THIS should be before clipping, we want to know the true score of the game there!
-            if timestep == (5 * 60 * 60)/args.action_repeat: # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
+            current_total_reward_SABER += (
+                reward
+            )  # THIS should be before clipping, we want to know the true score of the game there!
+            if (
+                timestep == (5 * 60 * 60) / args.action_repeat
+            ):  # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
                 current_total_reward_5min = current_total_reward_SABER
-            if timestep == (30 * 60 * 60)/args.action_repeat: # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
+            if (
+                timestep == (30 * 60 * 60) / args.action_repeat
+            ):  # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
                 current_total_reward_30min = current_total_reward_SABER
 
         if args.reward_clip > 0:
@@ -132,42 +163,63 @@ def launch_actor(id_actor, args, redis_servor):
         tab_nonterminal.append(not done_actor)
 
         if T_actor % args.log_interval == 0:
-            log('T = ' + str(T_actor) + ' / ' + str(args.T_max))
+            log("T = " + str(T_actor) + " / " + str(args.T_max))
             duration_actor = time.time() - start_time_actor
-            print('Time between 2 log_interval for actor ' + str(id_actor) + ' (%.3f sec)' % duration_actor)
+            print(
+                "Time between 2 log_interval for actor "
+                + str(id_actor)
+                + " (%.3f sec)" % duration_actor
+            )
             start_time_actor = time.time()
 
         if T_actor % args.weight_synchro_frequency == 0:
             actor.load_weight_from_redis()
 
         if len(actor_buffer) >= args.length_actor_buffer:
-            if (not mem_actor.transitions.actor_full) and ((index_actor_in_memory + len(actor_buffer)) >= mem_actor.transitions.actor_capacity):
+            if (not mem_actor.transitions.actor_full) and (
+                (index_actor_in_memory + len(actor_buffer)) >= mem_actor.transitions.actor_capacity
+            ):
                 redis_servor.set(CST.IS_FULL_ACTOR_STR + str(id_actor), 1)
                 mem_actor.transitions.actor_full = True
 
-#            start_time_test = time.time()
-            priorities_buffer = actor.compute_priorities(tab_state, tab_action, tab_reward, tab_nonterminal, mem_actor.priority_exponent)
+            #            start_time_test = time.time()
+            priorities_buffer = actor.compute_priorities(
+                tab_state, tab_action, tab_reward, tab_nonterminal, mem_actor.priority_exponent
+            )
 
-            #We dont have the next_states for the last n_step states in the buffer so we just set their
-            # priorities to max priorities (should be 3/args.length_buffer_actor experience so a bit negligeable...)
+            # We dont have the next_states for the last n_step states in the buffer so we just
+            # set their priorities to max priorities (should be 3/args.length_buffer_actor
+            # experience so a bit negligeable...)
             max_priority = np.float64(redis_servor.get(CST.MAX_PRIORITY_STR))
             last_priorities = np.ones(mem_actor.n) * max_priority
 
             all_priorities = np.concatenate((priorities_buffer, last_priorities))
-#            end_time_test = time.time()
-#            print("time calculating all_priorities = (%.3f sec)" % (end_time_test-start_time_test))
-#            print("all_priorities = ", all_priorities )
-#             print("np.mean(priorities_buffer) = ", np.mean(priorities_buffer))
-#             print("np.max(priorities_buffer) = ", np.max(priorities_buffer))
-#             print("np.min(priorities_buffer) = ", np.min(priorities_buffer))
-#             print("max_priority = ", max_priority)
-            p = Process(target=send_actor_buffer, args=(actor_buffer, index_actor_in_memory, id_actor, mem_actor, all_priorities, T_actor))
+
+            p = Process(
+                target=send_actor_buffer,
+                args=(
+                    actor_buffer,
+                    index_actor_in_memory,
+                    id_actor,
+                    mem_actor,
+                    all_priorities,
+                    T_actor,
+                ),
+            )
             p.daemon = True
             p.start()
-            index_actor_in_memory = (index_actor_in_memory + len(actor_buffer)) % args.actor_capacity
-            if (args.synchronize_actors_with_learner) and (T_actor >= step_to_start_sleep): # Make actors sleep to wait learner if synchronization is on! Actors are always faster than learner
+            index_actor_in_memory = (
+                index_actor_in_memory + len(actor_buffer)
+            ) % args.actor_capacity
+            if (args.synchronize_actors_with_learner) and (
+                T_actor >= step_to_start_sleep
+            ):  # Make actors sleep to wait learner if synchronization is on!
+                # Actors are always faster than learner
                 T_learner = int(redis_servor.get(CST.STEP_LEARNER_STR))
-                while T_learner + 2 * args.weight_synchro_frequency <= T_actor*args.nb_actor: # We had a bug at the end because learner don't put in redis memory that he reached 50 M and actor was sleeping all time...
+                while (
+                    T_learner + 2 * args.weight_synchro_frequency <= T_actor * args.nb_actor
+                ):  # We had a bug at the end because learner don't put in redis memory that
+                    # he reached 50 M and actor was sleeping all time...
                     time.sleep(CST.TIME_TO_SLEEP)
                     T_learner = int(redis_servor.get(CST.STEP_LEARNER_STR))
             actor_buffer = []
@@ -181,8 +233,13 @@ def launch_actor(id_actor, args, redis_servor):
         if T_actor % args.target_update == 0:
             actor.update_target_net()
 
-        # Plot and dump in csv every evaluation_interval steps (there is in fact not any evaluation done, we just keep track of score while training)
-        if T_actor % (args.evaluation_interval/args.nb_actor) == 0 and id_actor == 0 and T_actor > initial_T_actor:
+        # Plot and dump in csv every evaluation_interval steps (there is in fact not any
+        # evaluation done, we just keep track of score while training)
+        if (
+            T_actor % (args.evaluation_interval / args.nb_actor) == 0
+            and id_actor == 0
+            and T_actor > initial_T_actor
+        ):
             pipe = redis_servor.pipeline()
             pipe.get(CST.STEP_LEARNER_STR)
             for id_actor_loop in range(args.nb_actor):
@@ -190,9 +247,12 @@ def launch_actor(id_actor, args, redis_servor):
             step_all_agent = pipe.execute()
 
             T_learner = int(
-                step_all_agent.pop(0))  # We remove first element of the list because it's the number of learner step
+                step_all_agent.pop(0)
+            )  # We remove first element of the list because it's the number of learner step
             T_total_actors = 0
-            if args.nb_actor == 1: # If only one actor don't bother checking all values in redis server, we got this value locally
+            if (
+                args.nb_actor == 1
+            ):  # If only one actor, we can just get this value locally
                 T_total_actors = T_actor
             else:
                 for nb_step_actor in step_all_agent:
@@ -201,39 +261,72 @@ def launch_actor(id_actor, args, redis_servor):
             Tab_T_actors.append(T_total_actors)
             Tab_T_learner.append(T_learner)
 
-            current_avg_episode_length = sum(episode_length_buffer)/ len(episode_length_buffer)
+            current_avg_episode_length = sum(episode_length_buffer) / len(episode_length_buffer)
             Tab_length_episode.append(current_avg_episode_length)
 
             indice_longest_episode = np.argmax(episode_length_buffer)
-            Tab_longest_episode.append((episode_length_buffer[indice_longest_episode], total_reward_buffer_SABER[indice_longest_episode]))
+            Tab_longest_episode.append(
+                (
+                    episode_length_buffer[indice_longest_episode],
+                    total_reward_buffer_SABER[indice_longest_episode],
+                )
+            )
 
-            current_avg_reward = sum(total_reward_buffer_SABER)/ len(total_reward_buffer_SABER)
+            current_avg_reward = sum(total_reward_buffer_SABER) / len(total_reward_buffer_SABER)
 
-            log('T = ' + str(T_total_actors) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(current_avg_reward))
+            log(
+                "T = "
+                + str(T_total_actors)
+                + " / "
+                + str(args.T_max)
+                + " | Avg. reward: "
+                + str(current_avg_reward)
+            )
 
             tab_rewards_plot.append(list(total_reward_buffer_SABER))
 
             # Plot
-            _plot_line(Tab_T_actors, Tab_T_learner, Tab_length_episode, Tab_longest_episode, tab_rewards_plot, 'Reward_'+args.game, path='results')
+            _plot_line(
+                Tab_T_actors,
+                Tab_T_learner,
+                Tab_length_episode,
+                Tab_longest_episode,
+                tab_rewards_plot,
+                "Reward_" + args.game,
+                path="results",
+            )
 
-            dump_in_csv(args.game, T_total_actors, T_learner, total_reward_buffer_5min, total_reward_buffer_30min, total_reward_buffer_SABER, episode_length_buffer)
+            dump_in_csv(
+                args.game,
+                T_total_actors,
+                T_learner,
+                total_reward_buffer_5min,
+                total_reward_buffer_30min,
+                total_reward_buffer_SABER,
+                episode_length_buffer,
+            )
 
-            for filename in os.listdir('results'):
-                if "last_model_"+args.game in filename:
+            for filename in os.listdir("results"):
+                if "last_model_" + args.game in filename:
                     try:
-                        os.remove(os.path.join('results', filename))
+                        os.remove(os.path.join("results", filename))
                     except OSError:
-                        print("last_model_"+args.game + "were not found, that's not suppose to happen...")
+                        print(
+                            "last_model_"
+                            + args.game
+                            + "were not found, that's not suppose to happen..."
+                        )
                         pass
-            actor.save('results', 'last_model_' + args.game + "_"+str(T_total_actors)+'.pth')
+            actor.save("results", "last_model_" + args.game + "_" + str(T_total_actors) + ".pth")
 
             if current_avg_reward > best_avg_reward:
                 best_avg_reward = current_avg_reward
-                actor.save('results', 'best_model_'+args.game+'.pth')
+                actor.save("results", "best_model_" + args.game + ".pth")
 
         state_buffer_actor = next_state_buffer_actor
         timestep += 1
         T_actor += 1
+
 
 args = return_args()
 
@@ -241,9 +334,9 @@ redis_servor = None
 while True:
     try:
         redis_servor = redis.StrictRedis(host=args.host_redis, port=args.port_redis, db=0)
-        redis_servor.set('foo', 'bar')
-        redis_servor.delete('foo')
-        print('Connected to redis servor.')
+        redis_servor.set("foo", "bar")
+        redis_servor.delete("foo")
+        print("Connected to redis servor.")
         break
 
     except redis.exceptions.ConnectionError as error:
@@ -253,7 +346,9 @@ while True:
 # Check if learner finished to initialize the redis-servor
 model_weight_from_learner = redis_servor.get(CST.MODEL_WEIGHT_STR)
 while model_weight_from_learner is None:
-    print("redis servor not initialized, probably because learner is still working on it") # This should not take more than 30 seconds!
+    print(
+        "redis servor not initialized, probably because learner is still working on it"
+    )  # This should not take more than 30 seconds!
     time.sleep(10)
     model_weight_from_learner = redis_servor.get(CST.MODEL_WEIGHT_STR)
 launch_actor(args.id_actor, args, redis_servor)
