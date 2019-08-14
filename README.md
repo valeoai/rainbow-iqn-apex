@@ -35,6 +35,25 @@ To install all dependencies with Anaconda run `$ conda env create -f environment
 If no Anaconda, install [pytorch](https://pytorch.org/) and then install the following packages
  with pip: atari-py, redlock-py, plotly, opencv-python
 
+Afterwards, you can install the package with:
+```bash
+pip install --editable ./rainbow-iqn-apex
+```
+
+You will be able to use functions and classes from this project into other projects,
+if you make changes to the sources files, those changes will be immediately
+seen next time you restart the python interpreter 
+(or reload the package with importlib):
+```python
+import rainbowiqn
+```
+
+Uninstall it with:
+```bash
+pip uninstall rainbow-iqn-apex
+```
+
+
 This code has been tested on Ubuntu 16 and 18. <br/>
 
 Open 3 terminal to sanity check if every thing is working (launchs an experiment with one actor on space_invaders): <br/>
