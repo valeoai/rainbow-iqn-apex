@@ -2,7 +2,6 @@ import argparse
 import random
 import torch
 import os
-import re
 
 
 def return_args():
@@ -222,8 +221,8 @@ def return_args():
     # Rainbow only parameters(no IQN and C51 instead)
     parser.add_argument(
         "--rainbow-only",
-        type=bool,
-        default=False,
+        type=int,
+        default=0,
         help="Remove IQN and use standard Rainbow instead (still distributed with Ape-X",
     )
     parser.add_argument(
@@ -256,13 +255,17 @@ def return_args():
 
     parser.add_argument(
         "--synchronize-actors-with-learner",
-        type=bool,
-        default=True,
+        type=int,
+        default=1,
         help="Should the actors wait for the learner (i.e. one step of learner for 4 steps of"
         "actor by default). Synchronization should be used in a single agent setting for"
         "reproducibility but we recommend to remove it if using more than 4 actors",
     )
-
+    parser.add_argument(
+        "--path-to-results", type=str, default=None,
+        help="Path to the results folder to store the results file. This is also used to resume"
+             "a stopped experiment (default is results folder in project root)"
+    )
     # Setup
     args = parser.parse_args()
 
@@ -286,12 +289,18 @@ def return_args():
     for k, v in vars(args).items():
         print(" " * 26 + k + ": " + str(v))
 
+    if args.path_to_results is None:
+        args.path_to_results = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.realpath(__file__))), "results")
+
     last_model = None
-    for filename in os.listdir("results"):
+    for filename in os.listdir(args.path_to_results):
         if "last_model_" + args.game in filename:
-            regex = re.compile(r"\d+")
-            step_already_done = int(regex.search(os.path.join("results", filename)).group(0))
-            last_model = os.path.join("results", filename)
+            last_model = os.path.join(args.path_to_results, filename)
+            # Always load tensors onto CPU by default, will shift to GPU if necessary
+            checkpoint = torch.load(last_model, map_location='cpu')
+            step_actors_already_done = checkpoint['T_actors']
+            step_learner_already_done = checkpoint['T_learner']
             break
     if last_model:
         args.continue_experiment = True
@@ -299,11 +308,14 @@ def return_args():
             "We are restarting a stopped experiment, we have to check now for the last model, "
             "this will override the --model parameter"
         )
-        print(
-            "We found the filename " + last_model + " to restart, number of step already done is ",
-            step_already_done,
-        )
-        args.step_already_done = step_already_done
+
+        print("We found the filename " + last_model + " to restart, number of step actor already "
+                                                      "done is ", step_actors_already_done)
+        print("We found the filename " + last_model + " to restart, number of step learner already"
+                                                      " done is ", step_learner_already_done)
+
+        args.step_actors_already_done = step_actors_already_done
+        args.step_learner_already_done = step_learner_already_done
         args.model = last_model
     else:
         args.continue_experiment = False
@@ -343,5 +355,8 @@ def return_args():
 
     if args.rainbow_only:
         print("Launching an experiment with Rainbow only (i.e. C51 instead of IQN)")
+    else:
+        print("Launching an experiment with Rainbow IQN (you can disable"
+              " IQN by using --rainbow-only True)")
 
     return args

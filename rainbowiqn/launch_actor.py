@@ -1,25 +1,25 @@
 import time
 from datetime import datetime
 
-from env import Env
+from rainbowiqn.env import Env
 
-from redis_memory import ReplayRedisMemory
+from rainbowiqn.redis_memory import ReplayRedisMemory
 
-from agent import Agent
+from rainbowiqn.agent import Agent
 
 from torch.multiprocessing import Process
 
 import redis
 import logging
-from args import return_args
+from rainbowiqn.args import return_args
 
 import numpy as np
 
-import CONSTANTS as CST
+import rainbowiqn.CONSTANTS as CST
 
 from collections import deque
 
-from utils import _plot_line, dump_in_csv
+from rainbowiqn.utils import _plot_line, dump_in_csv
 import random
 
 import os
@@ -50,18 +50,20 @@ def launch_actor(id_actor, args, redis_servor):
     if args.continue_experiment:
         print(
             "We are restarting a stopped experience with a model trained for "
-            + str(args.step_already_done)
+            + str(args.step_actors_already_done)
             + "steps"
         )
-        initial_T_actor = int((args.step_already_done - args.memory_capacity) / args.nb_actor)
+        initial_T_actor = int((args.step_actors_already_done
+                               - args.memory_capacity) / args.nb_actor)
         print("initial T actor equal ", initial_T_actor)
-        step_to_start_sleep = int(args.step_already_done / args.nb_actor)
+        step_to_start_sleep = int(args.step_actors_already_done / args.nb_actor)
     else:
         initial_T_actor = 0
         step_to_start_sleep = int(args.learn_start / args.nb_actor)
     T_actor = initial_T_actor
 
     index_actor_in_memory = 0
+    timestep = 0
     actor_buffer = []
     mem_actor = ReplayRedisMemory(args, redis_servor)
 
@@ -99,9 +101,6 @@ def launch_actor(id_actor, args, redis_servor):
 
     while T_actor < (args.T_max / args.nb_actor):
         if done_actor:
-            timestep = 0
-            state_buffer_actor = env_actor.reset()
-            done_actor = False
             if id_actor == 0 and T_actor > initial_T_actor:
                 total_reward_buffer_SABER.append(current_total_reward_SABER)
 
@@ -121,11 +120,14 @@ def launch_actor(id_actor, args, redis_servor):
                 current_total_reward_SABER = 0
                 current_total_reward_30min = 0
                 current_total_reward_5min = 0
+            timestep = 0
+            state_buffer_actor = env_actor.reset()
+            done_actor = False
 
         if T_actor % args.replay_frequency == 0:
             actor.reset_noise()  # Draw a new set of noisy weights
 
-        if T_actor < args.learn_start / args.nb_actor:
+        if T_actor < args.learn_start / args.nb_actor:  # Do random actions before learning start
             action = random.randint(0, env_actor.action_space() - 1)
         else:
             action = actor.act(
@@ -238,7 +240,7 @@ def launch_actor(id_actor, args, redis_servor):
         if (
             T_actor % (args.evaluation_interval / args.nb_actor) == 0
             and id_actor == 0
-            and T_actor > initial_T_actor
+            and T_actor >= (initial_T_actor + args.evaluation_interval/2)
         ):
             pipe = redis_servor.pipeline()
             pipe.get(CST.STEP_LEARNER_STR)
@@ -293,10 +295,11 @@ def launch_actor(id_actor, args, redis_servor):
                 Tab_longest_episode,
                 tab_rewards_plot,
                 "Reward_" + args.game,
-                path="results",
+                path=args.path_to_results,
             )
 
             dump_in_csv(
+                args.path_to_results,
                 args.game,
                 T_total_actors,
                 T_learner,
@@ -306,10 +309,10 @@ def launch_actor(id_actor, args, redis_servor):
                 episode_length_buffer,
             )
 
-            for filename in os.listdir("results"):
+            for filename in os.listdir(args.path_to_results):
                 if "last_model_" + args.game in filename:
                     try:
-                        os.remove(os.path.join("results", filename))
+                        os.remove(os.path.join(args.path_to_results, filename))
                     except OSError:
                         print(
                             "last_model_"
@@ -317,11 +320,14 @@ def launch_actor(id_actor, args, redis_servor):
                             + "were not found, that's not suppose to happen..."
                         )
                         pass
-            actor.save("results", "last_model_" + args.game + "_" + str(T_total_actors) + ".pth")
+            actor.save(args.path_to_results, T_total_actors, T_learner,
+                       "last_model_" + args.game +
+                       "_" + str(T_total_actors) + ".pth")
 
             if current_avg_reward > best_avg_reward:
                 best_avg_reward = current_avg_reward
-                actor.save("results", "best_model_" + args.game + ".pth")
+                actor.save(args.path_to_results, T_total_actors, T_learner,
+                           "best_model_" + args.game + ".pth")
 
         state_buffer_actor = next_state_buffer_actor
         timestep += 1

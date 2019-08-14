@@ -4,13 +4,13 @@ import torch
 from torch import optim
 import numpy as np
 
-from model import DQN
+from rainbowiqn.model import DQN
 
 import io
 import math
 
-import CONSTANTS as CST
-import compute_loss_iqn
+import rainbowiqn.CONSTANTS as CST
+import rainbowiqn.compute_loss_iqn as compute_loss_iqn
 
 
 class Agent:  # This class handle both actor and learner because most of their methods are shared
@@ -29,9 +29,10 @@ class Agent:  # This class handle both actor and learner because most of their m
         self.online_net = DQN(args, self.action_space).to(device=args.device)
         if args.model:
             if os.path.isfile(args.model):
-                # Always load tensors onto CPU by default, will shift to GPU if necessary
-                self.online_net.load_state_dict(torch.load(args.model, map_location="cpu"))
                 print("We loaded model ", args.model)
+                # Always load tensors onto CPU by default, will shift to GPU if necessary
+                checkpoint = torch.load(args.model, map_location='cpu')
+                self.online_net.load_state_dict(checkpoint['model_state_dict'])
             else:
                 print("We didn't fint the model you gave as input!")
                 raise Exception
@@ -44,6 +45,10 @@ class Agent:  # This class handle both actor and learner because most of their m
             param.requires_grad = False
 
         self.optimiser = optim.Adam(self.online_net.parameters(), lr=args.lr, eps=args.adam_eps)
+
+        if args.model:
+            # We already loaded the checkpoint there, no need to load it again
+            self.optimiser.load_state_dict(checkpoint['optimiser_state_dict'])
 
         self.rainbow_only = args.rainbow_only
 
@@ -184,9 +189,14 @@ class Agent:  # This class handle both actor and learner because most of their m
             else self.act(state_buffer)
         )
 
-    # Save model parameters on current device (don't move model between devices)
-    def save(self, path, name):
-        torch.save(self.online_net.state_dict(), os.path.join(path, name))
+    # Save model parameters on results folder (or on --path-to-results given)
+    def save(self, path, T_actors, T_learner, name):
+        # torch.save(self.online_net.state_dict(), os.path.join(path, name))
+        torch.save({
+            'T_actors': T_actors,
+            'T_learner': T_learner,
+            'model_state_dict': self.online_net.state_dict(),
+            'optimiser_state_dict': self.optimiser.state_dict()}, os.path.join(path, name))
 
     def train(self):
         self.online_net.train()

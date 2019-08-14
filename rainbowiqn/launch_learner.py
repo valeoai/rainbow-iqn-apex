@@ -3,15 +3,15 @@ from datetime import datetime
 import logging
 import time
 
-from env import Env
+from rainbowiqn.env import Env
 
-from redis_memory import ReplayRedisMemory
+from rainbowiqn.redis_memory import ReplayRedisMemory
 
-from agent import Agent
+from rainbowiqn.agent import Agent
 
 import redis
 
-from args import return_args
+from rainbowiqn.args import return_args
 
 from multiprocessing import Process, Queue
 
@@ -19,7 +19,7 @@ import torch
 import numpy as np
 import os
 
-import CONSTANTS as CST
+import rainbowiqn.CONSTANTS as CST
 
 
 # Simple ISO 8601 timestamped logger
@@ -97,10 +97,10 @@ print("Starting training loop")
 if args.continue_experiment:
     print(
         "We are restarting a stopped experience with a model trained for "
-        + str(args.step_already_done)
+        + str(args.step_learner_already_done)
         + "steps"
     )
-    initial_T_learner = args.step_already_done
+    initial_T_learner = args.step_learner_already_done
     print("initial T learner equal ", initial_T_learner)
     capacity_before_learning = (
         args.memory_capacity

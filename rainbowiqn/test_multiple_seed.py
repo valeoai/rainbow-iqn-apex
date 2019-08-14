@@ -9,12 +9,12 @@ Created on Wed Nov 21 12:20:12 2018
 import random
 import torch
 
-from env import Env
+from rainbowiqn.env import Env
 
-from agent import Agent
+from rainbowiqn.agent import Agent
 
 
-from args import return_args
+from rainbowiqn.args import return_args
 
 import time
 import numpy as np

@@ -3,7 +3,7 @@ from collections import namedtuple
 import torch
 import numpy as np
 import time
-import CONSTANTS as CST
+import rainbowiqn.CONSTANTS as CST
 
 import redlock
 

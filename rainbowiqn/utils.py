@@ -96,6 +96,7 @@ def _plot_line(
 
 
 def dump_in_csv(
+    path_to_results,
     name_game,
     T_total_actors,
     T_learner,
@@ -105,7 +106,7 @@ def dump_in_csv(
     episode_length_buffer,
 ):
 
-    name_csv = "results/" + name_game + ".csv"
+    name_csv = os.path.join(path_to_results, name_game + ".csv")
 
     assert (
         len(total_reward_buffer_5min)
