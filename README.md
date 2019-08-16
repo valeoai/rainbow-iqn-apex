@@ -61,135 +61,31 @@ Sanity check
 ------------
 
 Open 3 terminal to sanity check if every thing is working (this will launch an experiment with one actor on space_invaders): <br/>
-`$ redis-server redis_rainbow_6379.conf`: This launchs the redis servor on port 6379.<br/>
-`$ python rainbowiqn/launch_learner.py --memory-capacity 100000 --learn-start 8000 --log-interval 2500`: This launchs the learner <br/>
-`$ python rainbowiqn/launch_actor.py --id-actor 0 --memory-capacity 100000 --learn-start 8000 --log-interval 2500`: This launchs the actor <br/>
-
-If after a short time (1 minute probably), you see some logs like the following one appearing in the learner and the actor terminal, everything is OK! <br/>
-`[2019-08-12T17:40:11] T = 12500 / 50000000` <br/>
-`Time between 2 log_interval for learner (14.410 sec)` (for the learner) <br/>
-`[2019-08-12T17:40:06] T = 12500 / 50000000` <br/>
-`Time between 2 log_interval for actor 0 (13.249 sec)` (for the actor) <br/>
-
-Kill all 3 terminals after and see next sections to know how to launch experiments for real!
-
-Summary
-------------
-
-
-##### [Single actor setting](#singleActor)
-1) Launching an experiment
-2) Changing parameter
-3) Results : logs and snapshots of model
-4) Testing a trained model
-5) Resuming a stopped experiment
-
-##### [Multi-actor and/or parallel machine setting](#multiActor)
-1) Removing synchronisation actors/learner
-2) Launching a multi actor experiment on a multi-gpu machine
-3) Launching a multi actor experiment on parallel machine
-
-##### [SABER: A Standardized Atari Benchmark for general REinforcement learning algorithms](#saber)
-
-##### [Acknowledgements](#acknow)
-
-##### [References](#ref)
-
-<a name="singleActor">Single actor setting </a>
-------------
-
-On this part we will describe how to launch experiment with only one actor. This was used for our paper to make fair 
-comparaison with the single agent results of Rainbow, IQN and DQN.
-#### 1) Launching an experiment
-The easiest way to launch an experiment is to run the command <br/>
-`$ bash start_learning_atari_virtual_env.sh` (or 
-`$ bash start_learning_atari.sh` if installed manually without virtual env). <br/><br/>
-By default this will launch an experiment on space_invaders for 200M frames. The script will open 3 terminals with 
-gnome-terminal, the first  one will be the redis-server, the second one the learner and the last one 
-the single actor. <br/><br/>
-If this doesn't work (e.g. no display in docker), you must manually open 3 terminals and run the 3 commands below:
 ```bash
-$ redis-server redis_rainbow_6379.conf
-$ python rainbowiqn/launch_learner.py
-$ python rainbowiqn/launch_actor.py
+# Terminal 1. This launchs the redis servor on port 6379.
+$ redis-server redis_rainbow_6379.conf 
+ 
+# Terminal 2. This launchs the learner.
+$ python rainbowiqn/launch_learner.py --memory-capacity 100000 \
+                                      --learn-start 8000 \
+                                      --log-interval 2500
+                                      
+# Terminal 3. This launchs the actor.
+$ python rainbowiqn/launch_actor.py --id-actor 0 \
+                                    --memory-capacity 100000 \
+                                    --learn-start 8000
+                                    --log-interval 2500
+```
+If after a short time (1 minute probably), you see some logs like the following one appearing in the learner and the actor terminal, everything is OK! <br/>
+```bash
+[2019-08-12T17:40:11] T = 12500 / 50000000`
+Time between 2 log_interval for learner (14.410 sec)  # (for the learner)
+
+[2019-08-12T17:40:06] T = 12500 / 50000000`
+Time between 2 log_interval for actor 0 (13.249 sec)  # (for the actor)
 ```
 
-#### 2) Changing parameter
-
-All parameters can be seen in the file `args.py`. To change parameters either add them in the bash script or change them 
-directly in command line (or even change the default value in `args.py`).
-
-#### 3) Results : logs and snapshots of model
-
-All results file can be found in the `results` folder (or at the path you gave `--path-to-results`. <br/>
-`Reward_#game_name#.html`: A html plot of the reward along the training steps 
-(should be multiplied by the action repeat to get the number of frames) <br/>
-`#game_name#.csv`: A csv file on which all score of all episodes encountered while training are dumped.
-`last_model_#game_name#_#number_of_steps".pth`: The last model of the experiment<br/>
-`best_model_#game_name#".pth`: The best model encountered while training
- (we average evaluation over 100 consecutives while training, see SABER for more information). Remind that taking 
- the best snapshot involve a bias and it should not be used to report results. 
-
-#### 4) Testing a trained model
-
-To evaluate a snapshot, just use the command <br/>
-`$ python test_multiple_seed.py --game #game_name# --model #path_to_saved_snapshot#`<br/>
-This will evaluate the snapshot for 100 episodes varying the random seed. Add the option `--render` 
-to actually see the AI playing! (but it's way slower). <br/>
-Some pretrained snapshot will be released soon (along with logs and plot file).
-
-#### 5) Resuming a stopped experiment
-
-Stopped experiments are resumed by default. Indeed, when an experiment is stopped and resume, we first check if there is 
-a snapshot with name containing the string  "last_model_#name_game#" (see in `args.py` for more details). <br/>
-If a snapshot is found, then we first fill the whole replay memory without learning and then when the memory
- is full we actually resume the learning at the steps where the snapshot was stopped. This was the fairest resume we 
- could do without having to save the whole replay memory (which is by default of 7GB...). <br/>
-If you don't want to resume and actually make another experiment on the same game from scratch you should move the 
-results file away from the `results` folder (or your `--path-to-results`).
-
-
-<a name="multiActor">Multi-actor and/or parallel machines setting</a>
-------------
-
-On this part, we will describe the specificity on how to run a multi-actor experiment. We will also detail 
-how to run on parallel machine. All the points above (testing snapshot, resuming experiment...) also apply for 
-the multi-actor setting.
-
-
-#### 1) Removing synchronisation actors/learner
-
-By default, actors and learner are synchronized: 1 step of learner each 4 steps of actors as in Rainbow, IQN, DQN etc...<br/>
-If you use more than 4 actors (i.e. more than 4 instances of Atari in parallel), we recommend to remove the 
-synchronisation (set the parameter `--synchronize-actors-with-learner` to `False` `in args.py`).<br/>
-Indeed, if you keep synchronization, all actors will probably wait most of time doing nothing because learner will run way 
-slower than actors.
-
-#### 2) Launching a multi actor experiment on a multi-gpu machine
-
-You can modify the number of actors in the bash script `$ bash start_learning_atari_virtual_env.sh` (or 
-`$ bash start_learning_atari.sh` if installed manually without virtual env). You must also specifically indicate on which gpu 
-will run each actors and the learner. <br/>
-Then, running this bash script will open one terminal for each actors, one for the learner
-and one for the redis-servor (e.g. 5 terminals if 3 actors).
-
-#### 3) Launching a multi actor experiment on parallel machines
-
-If launching on parallel machine everything must be launched one terminal by one. <br/>
-Let's take the following example, launching 6 actors on Machine 0 with GPU 0/1 and learner on Machine 1 with GPU 0:<br/>
-<br/>
--run the redis-server on Machine 0 with command `$ redis-server redis_rainbow_6379.conf` (we recommend to run the redis
- servor on the same physical machine than the learner even if it's not mandatory)<br/>
--run the learner on Machine 0 with command `$ python launch_learner --nb-actor 6 --synchronize-actors-with-learner False`<br/>
--run actor 0 on Machine 1 on gpu 0 with command `$ python launch_actor --nb-actor 6 --nb-actor 0 
---synchronize-actors-with-learner False --host-redis IP_Machine_0`<br/>
--same for actor 1 and 2 on Machine 1 on gpu 0 (changing the id to 1 and 2 respectively)<br/>
--run actor 3 on Machine 1 on gpu 1 with command `$ python launch_actor --gpu-number 1 --nb-actor 6 --nb-actor 0 
---synchronize-actors-with-learner False --host-redis IP_Machine_0`<br/>
--same for actor 4 and 5 on Machine 1 on gpu 1 (changing the id to 4 and 5 respectively)<br/>
-
-`ERROR:root:Error 111 connecting to localhost:6379. Connection refused` => To allow actors (on Machine 1) to connect to the redis-server, you must add the ip of Machine 0 in 
-`redis_rainbow_6379.conf` and change the parameter `--host-redis` to the IP of Machine 0 (this is relative to Redis connection).
+Kill all 3 terminals after and see the [wiki](https://github.com/valeoai/rainbow-iqn-apex/wiki) to know how to launch experiments for real!
 
 <a name="saber">SABER: A Standardized Atari Benchmark for general REinforcement learning algorithms</a>
 ------------
