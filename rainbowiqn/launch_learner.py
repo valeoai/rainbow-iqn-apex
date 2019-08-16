@@ -9,7 +9,7 @@ import redis
 import torch
 
 import rainbowiqn.constants as cst
-from rainbowiqn.agent import Agent
+from rainbowiqn.learner import Learner
 from rainbowiqn.args import return_args
 from rainbowiqn.env import Env
 from rainbowiqn.redis_memory import ReplayRedisMemory
@@ -124,7 +124,7 @@ def main():
 
     memory_got_enough_experience = False
 
-    learner = Agent(args, action_space, redis_servor)
+    learner = Learner(args, action_space, redis_servor)
     learner.train()
     learner.save_to_redis(T)
 

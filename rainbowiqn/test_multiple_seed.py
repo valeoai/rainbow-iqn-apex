@@ -12,7 +12,7 @@ import time
 import numpy as np
 import torch
 
-from rainbowiqn.agent import Agent
+from rainbowiqn.actor import Actor
 from rainbowiqn.args import return_args
 from rainbowiqn.env import Env
 
@@ -32,7 +32,7 @@ def test_multiple_seed(args, debug=False):
         random.seed(args.seed)
         torch.manual_seed(random.randint(1, 10000))
         env = Env(args)
-        tester = Agent(args, env.action_space(), None)
+        tester = Actor(args, env.action_space(), None)
         step = 0
         while True:
             step += 1

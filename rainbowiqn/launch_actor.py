@@ -10,7 +10,7 @@ import redis
 from torch.multiprocessing import Process
 
 import rainbowiqn.constants as cst
-from rainbowiqn.agent import Agent
+from rainbowiqn.actor import Actor
 from rainbowiqn.args import return_args
 from rainbowiqn.env import Env
 from rainbowiqn.redis_memory import ReplayRedisMemory
@@ -20,19 +20,6 @@ from rainbowiqn.utils import _plot_line, dump_in_csv
 # Simple ISO 8601 timestamped logger
 def log(s):
     print("[" + str(datetime.now().strftime("%Y-%m-%dT%H:%M:%S")) + "] " + s)
-
-
-# Send actor buffer experience to main memory
-def send_actor_buffer(
-    actor_buffer, actor_index_in_replay_memory, id_actor, mem_actor, priorities, T_actor
-):
-    """actor_index_in_replay_memory is the index
-    in the memory where to start appending next buffer
-    """
-    mem_actor.transitions.append_actor_buffer(
-        actor_buffer, actor_index_in_replay_memory, id_actor, priorities, T_actor
-    )
-
 
 # Create an actor instance
 def launch_actor(id_actor, args, redis_servor):
@@ -63,7 +50,7 @@ def launch_actor(id_actor, args, redis_servor):
     actor_buffer = []
     mem_actor = ReplayRedisMemory(args, redis_servor)
 
-    actor = Agent(args, env_actor.action_space(), redis_servor)
+    actor = Actor(args, env_actor.action_space(), redis_servor)
 
     done_actor = True
 
@@ -168,6 +155,7 @@ def launch_actor(id_actor, args, redis_servor):
         if T_actor % args.weight_synchro_frequency == 0:
             actor.load_weight_from_redis()
 
+        # We want to send actor buffer in the redis memory with right initialized priorities
         if len(actor_buffer) >= args.length_actor_buffer:
             if (not mem_actor.transitions.actor_full) and (
                 (index_actor_in_memory + len(actor_buffer)) >= mem_actor.transitions.actor_capacity
@@ -188,12 +176,11 @@ def launch_actor(id_actor, args, redis_servor):
             all_priorities = np.concatenate((priorities_buffer, last_priorities))
 
             p = Process(
-                target=send_actor_buffer,
+                target=mem_actor.transitions.append_actor_buffer,
                 args=(
                     actor_buffer,
                     index_actor_in_memory,
                     id_actor,
-                    mem_actor,
                     all_priorities,
                     T_actor,
                 ),

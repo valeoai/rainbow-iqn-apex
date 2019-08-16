@@ -2,7 +2,7 @@ Rainbow-IQN Ape-X :
 =======
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
-Rainbow-IQN Ape-X is a new state-of-the-art algorithm on Atari coming
+Rainbow-IQN Ape-X is a new distributed state-of-the-art algorithm on Atari coming
 from the combination of the 3 following papers:<br/>
 Rainbow: Combining Improvements in Deep Reinforcement Learning [[1]](#references).<br/>
 IQN: Implicit Quantile Networks (IQN) for Distributional Reinforcement Learning [[2]](#references).<br/>
@@ -16,7 +16,7 @@ of Rainbow only, i.e. Rainbow Ape-X).<br/>
 The code presented here is at the basis of our paper *Is Deep Reinforcement 
 Learning really superhuman on Atari* [[4]](#references) on which
 we introduce SABER: a **S**tandardized Atari **BE**nchmark for general 
-**R**einforcement learning algorithms.<br/>
+**R**einforcement learning algorithms.<br/><br/>
 Importantly this code was the Reinforcement Learning part of the algorithm 
 I developed to win the 
 [CARLA challenge](https://carlachallenge.org/results-challenge-2019/)  on Track 2 *Cameras Only*. This success showed the 
@@ -73,7 +73,7 @@ $ python rainbowiqn/launch_learner.py --memory-capacity 100000 \
 # Terminal 3. This launchs the actor.
 $ python rainbowiqn/launch_actor.py --id-actor 0 \
                                     --memory-capacity 100000 \
-                                    --learn-start 8000
+                                    --learn-start 8000 \
                                     --log-interval 2500
 ```
 If after a short time (1 minute probably), you see some logs like the following one appearing in the learner and the actor terminal, everything is OK! <br/>
