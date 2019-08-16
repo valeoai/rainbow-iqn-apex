@@ -24,7 +24,8 @@ import rainbowiqn.constants as cst
 
 # Simple ISO 8601 timestamped logger
 def log(s):
-    print("[" + str(datetime.now().strftime("%Y-%m-%dT%H:%M:%S")) + "] " + s)
+    formatted_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    print(f"[{formatted_time}] {s}")
 
 
 def sample_in_thread(mp_queue_sample, mem_redis, batchsize, queue_size):
