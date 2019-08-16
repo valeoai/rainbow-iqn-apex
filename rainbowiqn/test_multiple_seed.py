@@ -25,7 +25,7 @@ def test_multiple_seed(args, debug=False):
     T_rewards = []
     T_rewards_5minutes = []
     T_true_RL_reward = []  # This is the actual reward the agent see, can be really different
-                           # from the game score because we clip the reward between -1 and 1 by default!
+    # from the game score because we clip the reward between -1 and 1 by default!
     epsilon = 0  # We got sticky actions now
     # Test performance over several episodes varying the random seed
     done = True

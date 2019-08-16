@@ -113,9 +113,7 @@ def dump_in_csv(
 
     with open(name_csv, "a") as csvfile:
         filewriter = csv.writer(csvfile, delimiter=",", quotechar="|", quoting=csv.QUOTE_MINIMAL)
-        filewriter.writerow(
-            ["Step actors : " + str(T_total_actors), "Step learner : " + str(T_learner)]
-        )
+        filewriter.writerow([f"Step actors : {T_total_actors} Step learner : {T_learner}"])
         filewriter.writerow(
             ["score 5 minutes", "score 30 minutes", "score SABER", "length episode"]
         )
