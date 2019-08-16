@@ -297,35 +297,44 @@ def return_args():
             os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "results"
         )
 
-    last_model = None
-    for filename in os.listdir(args.path_to_results):
-        if "last_model_" + args.game in filename:
-            last_model = os.path.join(args.path_to_results, filename)
-            # Always load tensors onto CPU by default, will shift to GPU if necessary
-            checkpoint = torch.load(last_model, map_location="cpu")
-            step_actors_already_done = checkpoint["T_actors"]
-            step_learner_already_done = checkpoint["T_learner"]
-            break
-    if last_model:
-        args.continue_experiment = True
-        print(
-            "We are restarting a stopped experiment, we have to check now for the last model, "
-            "this will override the --model parameter"
-        )
+    # If no model gave as argument, we check if there is an experiment to resume from.
+    # If there is a file name last_model_name_game in the --path-to-results folder
+    # then we resume the stopped experiment with this snapshot.
+    # If --model is given we just start experiment from scratch with weight initialize with --model
+    # This allow to resume experiment by default (with the exact same command to launch or resume)
+    if args.model is None:
+        last_model = None
+        for filename in os.listdir(args.path_to_results):
+            if "last_model_" + args.game in filename:
+                last_model = os.path.join(args.path_to_results, filename)
+                # Always load tensors onto CPU by default, will shift to GPU if necessary
+                checkpoint = torch.load(last_model, map_location="cpu")
+                step_actors_already_done = checkpoint["T_actors"]
+                step_learner_already_done = checkpoint["T_learner"]
+                break
+        if last_model:
+            args.continue_experiment = True
+            print(
+                "We are restarting a stopped experiment, we have to check now for the last model"
+            )
 
-        print(
-            f"We found the filename {last_model} to restart, number of step actor already "
-            f"done is {step_actors_already_done}"
-        )
-        print(
-            "We found the filename " + last_model + " to restart, number of step learner already"
-            " done is ",
-            step_learner_already_done,
-        )
+            print(
+                f"We found the filename {last_model} to restart, number of step actor already "
+                f"done is {step_actors_already_done}"
+            )
+            print(
+                "We found the filename "
+                + last_model
+                + " to restart, number of step learner already"
+                " done is ",
+                step_learner_already_done,
+            )
 
-        args.step_actors_already_done = step_actors_already_done
-        args.step_learner_already_done = step_learner_already_done
-        args.model = last_model
+            args.step_actors_already_done = step_actors_already_done
+            args.step_learner_already_done = step_learner_already_done
+            args.model = last_model
+        else:
+            args.continue_experiment = False
     else:
         args.continue_experiment = False
 

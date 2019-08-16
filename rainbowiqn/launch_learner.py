@@ -95,7 +95,7 @@ def main():
 
     start_time = time.time()
 
-    # We just create an env to get the action_space... a bit silly but it's maybe the most proper way.
+    # We just create an env to get the action_space. A bit silly but its maybe the most proper way.
     env_tmp = Env(args)
     action_space = env_tmp.action_space()
     del env_tmp
@@ -106,7 +106,8 @@ def main():
     # Training loop
     if args.continue_experiment:
         print(
-            f"We are restarting a stopped experience with a model trained for {args.step_learner_already_done} steps"
+            f"We are restarting a stopped experience with a model"
+            f" trained for {args.step_learner_already_done} steps"
         )
         initial_T_learner = args.step_learner_already_done
         print("initial T learner equal ", initial_T_learner)
