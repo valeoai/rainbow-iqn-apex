@@ -88,9 +88,11 @@ class Agent:
     def update_target_net(self):
         self.target_net.load_state_dict(self.online_net.state_dict())
 
-    # Compute loss for actor or learner, if it's for learner then we have to keep gradient flowing
-    # but not if it's for actor which is just use to initialize priorities!
     def compute_loss_actor_or_learner(self, states, actions, returns, next_states, nonterminals):
+        """Compute loss for actor or learner, if it's for learner then
+        we have to keep gradient flowing but not if it's for actor which is
+        just use to initialize priorities!
+        """
         if self.rainbow_only:  # Rainbow only loss (C51 in stead of IQN)
             batch_size = len(states)
 
@@ -177,13 +179,9 @@ class Agent:
 
         return idxs, loss
 
-        #
-        # return idxs, priorities
-
-    # Acts with an ε-greedy policy (used for evaluation only in test_multiple_seed.py)
-    def act_e_greedy(
-        self, state_buffer, epsilon=0.001
-    ):  # High ε can reduce eval score drastically
+    def act_e_greedy(self, state_buffer, epsilon=0.001):
+        """ Acts with an ε-greedy policy (used for evaluation only in test_multiple_seed.py)
+        High ε can reduce eval score drastically"""
         return (
             random.randrange(self.action_space)
             if random.random() < epsilon
@@ -209,9 +207,8 @@ class Agent:
     def eval(self):
         self.online_net.eval()
 
-    # Store weight into redis servor
     def save_to_redis(self, T_learner):
-        # test_state_dict_before = copy.deepcopy(self.online_net.state_dict())
+        """Store weight into redis servor"""
 
         # ONLY PART WHICH IS NOT TO REMOVE
         save_bytesIO = io.BytesIO()
@@ -221,27 +218,23 @@ class Agent:
         pipe.set(cst.STEP_LEARNER_STR, T_learner)
         pipe.execute()
 
-    ########################
-    #   ONLY FOR LEARNER   #
-    ########################
-
-    ######################
-    #   ONLY FOR ACTOR   #
-    ######################
-
-    # Load weight from redis database
     def load_weight_from_redis(self):
+        """Load weight from redis database"""
         load_bytesIO = io.BytesIO(self.redis_servor.get(cst.MODEL_WEIGHT_STR))
         self.online_net.load_state_dict(torch.load(load_bytesIO, map_location="cpu"))
 
-    # Compute priorities before sending experience to redis replay
-    # SOMETHING TO KEEP IN MIND, THE RETURNS CAN BE WRONG NEAR TERMINAL STATE AND
-    # IF REWARD AT BEGINNING OF EPISODE ARE NOT ZERO... (should we care?)
-    # In fact the states and next_states are also wrong near terminal state... it's kinda hard to
-    # take care of this properly, so we just initialize priorities badly around terminal state...
     def compute_priorities(
         self, tab_state, tab_action, tab_reward, tab_nonterminal, priority_exponent
     ):
+        """
+        Compute priorities before sending experience to redis replay
+        SOMETHING TO KEEP IN MIND, THE RETURNS CAN BE WRONG NEAR TERMINAL STATE AND
+        IF REWARD AT BEGINNING OF EPISODE ARE NOT ZERO... (should we care?)
+        In fact the states and next_states are also wrong near
+        terminal state... it's kinda hard to
+        take care of this properly, so we just
+        initialize priorities badly around terminal state...
+        """
         # REMINDER INDICE IN tab_state goes from -3 to len_buffer, the idea is that we got 3 more
         # states because we stack 4 states before sending it to network
         len_buffer = len(tab_action)
@@ -314,7 +307,3 @@ class Agent:
         priorities = np.concatenate(tab_priorities)
 
         return np.power(priorities, priority_exponent)
-
-    ######################
-    #   ONLY FOR ACTOR   #
-    ######################
