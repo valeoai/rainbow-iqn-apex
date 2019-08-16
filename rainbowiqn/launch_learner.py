@@ -103,9 +103,7 @@ if args.continue_experiment:
     initial_T_learner = args.step_learner_already_done
     print("initial T learner equal ", initial_T_learner)
     # We fill the memory before learning when restarting an experiment (for a fair restart)
-    capacity_before_learning = (
-        args.memory_capacity
-    )
+    capacity_before_learning = args.memory_capacity
 else:
     initial_T_learner = args.learn_start
     capacity_before_learning = args.learn_start
@@ -123,14 +121,10 @@ learner.train()
 learner.save_to_redis(T)
 
 # Queue filled by mem_learner.sample() and read to make the backprop...
-mp_queue_sample = Queue(
-    args.queue_size
-)
+mp_queue_sample = Queue(args.queue_size)
 
 # Queue filled with priorities of batch and read to update them in the redis_database
-mp_queue_update_priorities = Queue(
-    args.queue_size
-)
+mp_queue_update_priorities = Queue(args.queue_size)
 
 buffer_idxs = []
 buffer_loss = []
@@ -213,8 +207,10 @@ while T < args.T_max:
 
     else:
         time_to_wait = 10
-        print(f"not enough experience in memory, we wait {time_to_wait} "
-              f"seconds before trying again")
+        print(
+            f"not enough experience in memory, we wait {time_to_wait} "
+            f"seconds before trying again"
+        )
         time.sleep(time_to_wait)
 
     T += 1
