@@ -7,6 +7,7 @@ import torch
 import rainbowiqn.constants as cst
 from rainbowiqn.agent import Agent
 
+
 class Actor(Agent):
     """This class just handle actor specific methods"""
 

@@ -21,6 +21,7 @@ from rainbowiqn.utils import _plot_line, dump_in_csv
 def log(s):
     print("[" + str(datetime.now().strftime("%Y-%m-%dT%H:%M:%S")) + "] " + s)
 
+
 # Create an actor instance
 def launch_actor(id_actor, args, redis_servor):
 
@@ -177,13 +178,7 @@ def launch_actor(id_actor, args, redis_servor):
 
             p = Process(
                 target=mem_actor.transitions.append_actor_buffer,
-                args=(
-                    actor_buffer,
-                    index_actor_in_memory,
-                    id_actor,
-                    all_priorities,
-                    T_actor,
-                ),
+                args=(actor_buffer, index_actor_in_memory, id_actor, all_priorities, T_actor),
             )
             p.daemon = True
             p.start()

@@ -4,6 +4,7 @@ import torch
 import rainbowiqn.constants as cst
 from rainbowiqn.agent import Agent
 
+
 class Learner(Agent):
     """This class just handle learner specific methods"""
 
