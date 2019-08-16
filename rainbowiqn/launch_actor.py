@@ -338,27 +338,32 @@ def launch_actor(id_actor, args, redis_servor):
         T_actor += 1
 
 
-args = return_args()
+def main():
+    args = return_args()
 
-redis_servor = None
-while True:
-    try:
-        redis_servor = redis.StrictRedis(host=args.host_redis, port=args.port_redis, db=0)
-        redis_servor.set("foo", "bar")
-        redis_servor.delete("foo")
-        print("Connected to redis servor.")
-        break
+    redis_servor = None
+    while True:
+        try:
+            redis_servor = redis.StrictRedis(host=args.host_redis, port=args.port_redis, db=0)
+            redis_servor.set("foo", "bar")
+            redis_servor.delete("foo")
+            print("Connected to redis servor.")
+            break
 
-    except redis.exceptions.ConnectionError as error:
-        logging.error(error)
-        time.sleep(1)
+        except redis.exceptions.ConnectionError as error:
+            logging.error(error)
+            time.sleep(1)
 
-# Check if learner finished to initialize the redis-servor
-model_weight_from_learner = redis_servor.get(cst.MODEL_WEIGHT_STR)
-while model_weight_from_learner is None:
-    print(
-        "redis servor not initialized, probably because learner is still working on it"
-    )  # This should not take more than 30 seconds!
-    time.sleep(10)
+    # Check if learner finished to initialize the redis-servor
     model_weight_from_learner = redis_servor.get(cst.MODEL_WEIGHT_STR)
-launch_actor(args.id_actor, args, redis_servor)
+    while model_weight_from_learner is None:
+        print(
+            "redis servor not initialized, probably because learner is still working on it"
+        )  # This should not take more than 30 seconds!
+        time.sleep(10)
+        model_weight_from_learner = redis_servor.get(cst.MODEL_WEIGHT_STR)
+    launch_actor(args.id_actor, args, redis_servor)
+
+
+if __name__ == "__main__":
+    main()
