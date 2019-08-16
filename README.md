@@ -78,10 +78,10 @@ $ python rainbowiqn/launch_actor.py --id-actor 0 \
 ```
 If after a short time (1 minute probably), you see some logs like the following one appearing in the learner and the actor terminal, everything is OK! <br/>
 ```bash
-[2019-08-12T17:40:11] T = 12500 / 50000000`
+[2019-08-12T17:40:11] T = 12500 / 50000000
 Time between 2 log_interval for learner (14.410 sec)  # (for the learner)
 
-[2019-08-12T17:40:06] T = 12500 / 50000000`
+[2019-08-12T17:40:06] T = 12500 / 50000000
 Time between 2 log_interval for actor 0 (13.249 sec)  # (for the actor)
 ```
 
