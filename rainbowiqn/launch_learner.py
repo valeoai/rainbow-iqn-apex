@@ -133,7 +133,7 @@ def main():
         if T % args.log_interval == 0:
             log(f"T = {T} / {args.T_max}")
             duration = time.time() - start_time
-            print("Time between 2 log_interval for learner (%.3f sec)" % duration)
+            print(f"Time between 2 log_interval for learner ({duration:.3f} sec)")
             start_time = time.time()
 
         # Train and test
