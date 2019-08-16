@@ -89,7 +89,7 @@ def test_multiple_seed(args, debug=False):
     avg_reward = sum(T_rewards) / len(T_rewards)
 
     if debug:
-        print("avg_reward on " + str(args.evaluation_episodes) + " is ", avg_reward)
+        print(f"avg_reward on {args.evaluation_episodes} is {avg_reward}")
 
     return avg_reward
 
