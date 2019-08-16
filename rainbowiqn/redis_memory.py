@@ -3,7 +3,7 @@ from collections import namedtuple
 import torch
 import numpy as np
 import time
-import rainbowiqn.CONSTANTS as CST
+import rainbowiqn.constants as cst
 
 import redlock
 
@@ -32,27 +32,27 @@ class RedisSegmentTree:
         self.synchronise_actors_with_learner = synchronize_actors_with_learner
         if self.synchronise_actors_with_learner:
             redlock_manager = redlock.Redlock([{"host": host_redis, "port": port_redis, "db": 0}])
-            redlock_manager.retry_count = CST.RETRY_COUNT
-            redlock_manager.retry_delay = CST.RETRY_DELAY
+            redlock_manager.retry_count = cst.RETRY_COUNT
+            redlock_manager.retry_delay = cst.RETRY_DELAY
             self.redlock_manager = redlock_manager
 
     def acquire_redlock(self):
         red_lock = False
         redlock_manager = self.redlock_manager
         while not red_lock:
-            red_lock = redlock_manager.lock(CST.NAME_REDLOCK, CST.LOCK_LIFE_LONG)
-            time.sleep(CST.RETRY_DELAY)
+            red_lock = redlock_manager.lock(cst.NAME_REDLOCK, cst.LOCK_LIFE_LONG)
+            time.sleep(cst.RETRY_DELAY)
         return red_lock, redlock_manager
 
     def acquire_redlock_debug(
         self
-    ):  # ADD A CST.RETRY_COUNT ONLY FOR DEBUG, TOO SEE HOW MUCH TIME LOCK IS TRYING TO BE ACQUIRE
+    ):  # ADD A cst.RETRY_COUNT ONLY FOR DEBUG, TOO SEE HOW MUCH TIME LOCK IS TRYING TO BE ACQUIRE
         red_lock = False
         retry_count = 0
         redlock_manager = self.redlock_manager
         while not red_lock:
-            red_lock = redlock_manager.lock(CST.NAME_REDLOCK, CST.LOCK_LIFE_LONG)
-            time.sleep(CST.RETRY_DELAY)
+            red_lock = redlock_manager.lock(cst.NAME_REDLOCK, cst.LOCK_LIFE_LONG)
+            time.sleep(cst.RETRY_DELAY)
             retry_count += 1
         return red_lock, redlock_manager, retry_count
 
@@ -70,15 +70,15 @@ class RedisSegmentTree:
         start_time = time.time()
         pipe = redis_servor.pipeline()
         for index_priorities in range(2 * self.full_capacity - 1):
-            pipe.set(CST.PRIORITIES_STR + str(index_priorities), 0)
+            pipe.set(cst.PRIORITIES_STR + str(index_priorities), 0)
         print("initializing all actor_index to 0")
         for id_actor in range(self.nb_actor):
-            pipe.set(CST.INDEX_ACTOR_STR + str(id_actor), 0)
-            pipe.set(CST.STEP_ACTOR_STR + str(id_actor), 0)
-            pipe.set(CST.IS_FULL_ACTOR_STR + str(id_actor), 0)
+            pipe.set(cst.INDEX_ACTOR_STR + str(id_actor), 0)
+            pipe.set(cst.STEP_ACTOR_STR + str(id_actor), 0)
+            pipe.set(cst.IS_FULL_ACTOR_STR + str(id_actor), 0)
         print("initializing initial max priority to 1")
-        pipe.set(CST.MAX_PRIORITY_STR, 1)
-        pipe.set(CST.STEP_LEARNER_STR, 0)
+        pipe.set(cst.MAX_PRIORITY_STR, 1)
+        pipe.set(cst.STEP_LEARNER_STR, 0)
         pipe.execute()
         end_time = time.time()
         print(
@@ -93,10 +93,10 @@ class RedisSegmentTree:
                 index = indexes[current_indice]
                 diff_value = diff_values[current_indice]
                 if index != 0:
-                    pipe.incrbyfloat(CST.PRIORITIES_STR + str(index), diff_value)
+                    pipe.incrbyfloat(cst.PRIORITIES_STR + str(index), diff_value)
             indexes = (indexes - 1) // 2
         pipe.incrbyfloat(
-            CST.PRIORITIES_STR + str(0), np.sum(diff_values)
+            cst.PRIORITIES_STR + str(0), np.sum(diff_values)
         )  # Index is 0 there... we update the root of the sumtree
 
     # We check if sumtree is correct! This is not used in the code but it's a good way to debug.
@@ -109,7 +109,7 @@ class RedisSegmentTree:
         pipe = self.redis_servor.pipeline()
         for index_test in range(2 * self.full_capacity - 1):
 
-            pipe.get(CST.PRIORITIES_STR + str(index_test))
+            pipe.get(cst.PRIORITIES_STR + str(index_test))
 
         tab_byte_priorities = pipe.execute()
 
@@ -130,9 +130,9 @@ class RedisSegmentTree:
 
     # We update multiple value of priorities in place indeces in the sum tree
     def update_multiple_value(self, pipe, indeces, priorities):
-        pipe.get(CST.MAX_PRIORITY_STR)
+        pipe.get(cst.MAX_PRIORITY_STR)
         for idx in indeces:
-            pipe.get(CST.PRIORITIES_STR + str(idx))
+            pipe.get(cst.PRIORITIES_STR + str(idx))
         b_tab_old_values = pipe.execute()
         b_max = b_tab_old_values.pop(
             0
@@ -141,7 +141,7 @@ class RedisSegmentTree:
         self._propagate_multiple_values(pipe, indeces, priorities - np.float64(b_tab_old_values))
 
         if np.float64(max(priorities)) > np.float64(b_max):
-            pipe.set(CST.MAX_PRIORITY_STR, np.float64(max(priorities)))
+            pipe.set(cst.MAX_PRIORITY_STR, np.float64(max(priorities)))
 
     # This function add the actor buffer (consisting of multiple consecutive transitions)
     # at the right location in the redis-servor
@@ -174,7 +174,7 @@ class RedisSegmentTree:
             str_state = np_state.ravel().tostring()
 
             pipe.hmset(
-                CST.TRANSITIONS_STR + str(true_index_in_replay_memory),
+                cst.TRANSITIONS_STR + str(true_index_in_replay_memory),
                 {
                     "timestep": timestep,
                     "state": str_state,
@@ -186,8 +186,8 @@ class RedisSegmentTree:
 
             actor_index_in_replay_memory = (actor_index_in_replay_memory + 1) % self.actor_capacity
 
-        pipe.set(CST.INDEX_ACTOR_STR + str(id_actor), actor_index_in_replay_memory)
-        pipe.set(CST.STEP_ACTOR_STR + str(id_actor), T_actor)
+        pipe.set(cst.INDEX_ACTOR_STR + str(id_actor), actor_index_in_replay_memory)
+        pipe.set(cst.STEP_ACTOR_STR + str(id_actor), T_actor)
         # self.data[self.index] = data  # Store data in underlying data structure
 
         pipe.execute()
@@ -203,7 +203,7 @@ class RedisSegmentTree:
             return indexes
         else:
             for left in lefts:
-                pipe.get(CST.PRIORITIES_STR + str(left))
+                pipe.get(cst.PRIORITIES_STR + str(left))
 
         tab_b_sum_tree_left = pipe.execute()
         for current_indice in range(len(tab_b_sum_tree_left)):
@@ -299,7 +299,7 @@ class RedisSegmentTree:
         # We handle index to close from any actor_index by pushing it slightly away from this
         # actor_index (it should be far away by self.history and self.n to get valid transitions)
         for actor_id in range(self.nb_actor):
-            pipe.get(CST.INDEX_ACTOR_STR + str(actor_id))
+            pipe.get(cst.INDEX_ACTOR_STR + str(actor_id))
         tab_b_index_actor = pipe.execute()
         tab_index_actor = np.array([int(b_index_actor) for b_index_actor in tab_b_index_actor])
 
@@ -312,7 +312,7 @@ class RedisSegmentTree:
         # We get priorities from the tree_indexes and return them
 
         for tree_index in tree_indexes:
-            pipe.get(CST.PRIORITIES_STR + str(tree_index))
+            pipe.get(cst.PRIORITIES_STR + str(tree_index))
 
         tab_b_value_priorities = pipe.execute()
         tab_value_priorities = np.array(
@@ -331,7 +331,7 @@ class RedisSegmentTree:
         )  # Return value, data index, tree index
 
     def total(self):
-        b_sum_tree_total = self.redis_servor.get(CST.PRIORITIES_STR + str(0))
+        b_sum_tree_total = self.redis_servor.get(cst.PRIORITIES_STR + str(0))
         # print("b_sum_tree_total = ", b_sum_tree_total)
         # print("float(b_sum_tree_total) = ", float(b_sum_tree_total))
         return float(b_sum_tree_total)
@@ -353,7 +353,7 @@ class RedisSegmentTree:
             id_current_actor = index // self.actor_capacity
             for index_current_transition in range(length_transitions):
                 pipe.hmget(
-                    CST.TRANSITIONS_STR
+                    cst.TRANSITIONS_STR
                     + str(
                         (
                             (index_current_transition + index - history_length + 1)
@@ -377,8 +377,8 @@ class RedisSegmentTree:
         pipe = self.redis_servor.pipeline()
         is_memory_full = True
         for id_actor in range(self.nb_actor):
-            pipe.get(CST.IS_FULL_ACTOR_STR + str(id_actor))
-            pipe.get(CST.INDEX_ACTOR_STR + str(id_actor))
+            pipe.get(cst.IS_FULL_ACTOR_STR + str(id_actor))
+            pipe.get(cst.INDEX_ACTOR_STR + str(id_actor))
 
         tab_b_full_index_actor = pipe.execute()
         capacity = 0

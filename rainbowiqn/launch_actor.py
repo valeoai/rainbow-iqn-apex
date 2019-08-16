@@ -15,7 +15,7 @@ from rainbowiqn.args import return_args
 
 import numpy as np
 
-import rainbowiqn.CONSTANTS as CST
+import rainbowiqn.constants as cst
 
 from collections import deque
 
@@ -181,7 +181,7 @@ def launch_actor(id_actor, args, redis_servor):
             if (not mem_actor.transitions.actor_full) and (
                 (index_actor_in_memory + len(actor_buffer)) >= mem_actor.transitions.actor_capacity
             ):
-                redis_servor.set(CST.IS_FULL_ACTOR_STR + str(id_actor), 1)
+                redis_servor.set(cst.IS_FULL_ACTOR_STR + str(id_actor), 1)
                 mem_actor.transitions.actor_full = True
 
             #            start_time_test = time.time()
@@ -192,7 +192,7 @@ def launch_actor(id_actor, args, redis_servor):
             # We dont have the next_states for the last n_step states in the buffer so we just
             # set their priorities to max priorities (should be 3/args.length_buffer_actor
             # experience so a bit negligeable...)
-            max_priority = np.float64(redis_servor.get(CST.MAX_PRIORITY_STR))
+            max_priority = np.float64(redis_servor.get(cst.MAX_PRIORITY_STR))
             last_priorities = np.ones(mem_actor.n) * max_priority
 
             all_priorities = np.concatenate((priorities_buffer, last_priorities))
@@ -217,13 +217,13 @@ def launch_actor(id_actor, args, redis_servor):
                 T_actor >= step_to_start_sleep
             ):  # Make actors sleep to wait learner if synchronization is on!
                 # Actors are always faster than learner
-                T_learner = int(redis_servor.get(CST.STEP_LEARNER_STR))
+                T_learner = int(redis_servor.get(cst.STEP_LEARNER_STR))
                 while (
                     T_learner + 2 * args.weight_synchro_frequency <= T_actor * args.nb_actor
                 ):  # We had a bug at the end because learner don't put in redis memory that
                     # he reached 50 M and actor was sleeping all time...
-                    time.sleep(CST.TIME_TO_SLEEP)
-                    T_learner = int(redis_servor.get(CST.STEP_LEARNER_STR))
+                    time.sleep(cst.TIME_TO_SLEEP)
+                    T_learner = int(redis_servor.get(cst.STEP_LEARNER_STR))
             actor_buffer = []
 
             tab_state = []
@@ -243,9 +243,9 @@ def launch_actor(id_actor, args, redis_servor):
             and T_actor >= (initial_T_actor + args.evaluation_interval/2)
         ):
             pipe = redis_servor.pipeline()
-            pipe.get(CST.STEP_LEARNER_STR)
+            pipe.get(cst.STEP_LEARNER_STR)
             for id_actor_loop in range(args.nb_actor):
-                pipe.get(CST.STEP_ACTOR_STR + str(id_actor_loop))
+                pipe.get(cst.STEP_ACTOR_STR + str(id_actor_loop))
             step_all_agent = pipe.execute()
 
             T_learner = int(
@@ -350,11 +350,11 @@ while True:
         time.sleep(1)
 
 # Check if learner finished to initialize the redis-servor
-model_weight_from_learner = redis_servor.get(CST.MODEL_WEIGHT_STR)
+model_weight_from_learner = redis_servor.get(cst.MODEL_WEIGHT_STR)
 while model_weight_from_learner is None:
     print(
         "redis servor not initialized, probably because learner is still working on it"
     )  # This should not take more than 30 seconds!
     time.sleep(10)
-    model_weight_from_learner = redis_servor.get(CST.MODEL_WEIGHT_STR)
+    model_weight_from_learner = redis_servor.get(cst.MODEL_WEIGHT_STR)
 launch_actor(args.id_actor, args, redis_servor)
