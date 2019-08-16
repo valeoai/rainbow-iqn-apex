@@ -85,10 +85,6 @@ class Env:
                 self.SABER_mode_count = 0
 
             if self.SABER_mode_count > self.max_step_stuck_SABER:
-                # print(
-                #     "We didn't receive any reward for 5 minutes, probably game stuck, "
-                #     "let's end this episode"
-                # )
                 done = True
 
         # HANDLING BUG ON REWARD, particulary on defender!

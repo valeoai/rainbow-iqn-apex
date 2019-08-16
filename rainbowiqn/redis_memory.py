@@ -158,7 +158,6 @@ class RedisSegmentTree:
         This function add the actor buffer (consisting of multiple consecutive transitions)
         at the right location in the redis-servor
         """
-        # print("append some data to redis servor")
         indexes = (
             np.arange(
                 actor_index_in_replay_memory, actor_index_in_replay_memory + len(actor_buffer)
@@ -203,7 +202,6 @@ class RedisSegmentTree:
         pipe.execute()
         if self.synchronise_actors_with_learner:
             redlock_manager.unlock(red_lock)
-        # print("retry_count append_actor_buffer = ", retry_count)
 
     # Searches for the location of a value in sum tree
     def _retrieve_multiple_values(self, indexes, values):
@@ -331,7 +329,6 @@ class RedisSegmentTree:
 
         if self.synchronise_actors_with_learner:
             redlock_manager.unlock(red_lock)
-        # print("retry_count find_multiple_values = ", retry_count)
 
         return (
             tab_value_priorities,
@@ -342,8 +339,6 @@ class RedisSegmentTree:
 
     def total(self):
         b_sum_tree_total = self.redis_servor.get(cst.PRIORITIES_STR + str(0))
-        # print("b_sum_tree_total = ", b_sum_tree_total)
-        # print("float(b_sum_tree_total) = ", float(b_sum_tree_total))
         return float(b_sum_tree_total)
 
     def _byte_data_to_transition(self, b_data):
@@ -382,7 +377,6 @@ class RedisSegmentTree:
 
     def get_current_capacity(self):
         if self.memory_full:
-            # print("memory is full so we return full capacity")
             return self.full_capacity
         pipe = self.redis_servor.pipeline()
         is_memory_full = True
@@ -399,7 +393,6 @@ class RedisSegmentTree:
                 capacity += int(tab_b_full_index_actor[2 * id_actor + 1])
                 is_memory_full = False
         self.memory_full = is_memory_full
-        # print("memory is not full so we return current capacity equal to ", capacity)
         return capacity
 
 
@@ -449,10 +442,6 @@ class ReplayRedisMemory:
             tab_probs, data_indexes, tree_indexes, p_total = self.transitions.find_multiple_values(
                 self.history, self.n, batch_size
             )
-
-        # duration_test = time.time() - start_time_test
-        # print('Time in find_multiple_values = (%.3f sec)' % (duration_test))
-        # start_time_test = time.time()
 
         tab_byte_transition = self.transitions.get_byte_multiple_transition(
             data_indexes, self.history, self.n
@@ -573,4 +562,3 @@ class ReplayRedisMemory:
 
         if self.transitions.synchronise_actors_with_learner:
             redlock_manager.unlock(red_lock)
-        # print("retry_count update_multiple_value = ", retry_count)

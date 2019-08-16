@@ -221,19 +221,6 @@ class Agent:  # This class handle both actor and learner because most of their m
         pipe.set(cst.MODEL_WEIGHT_STR, save_bytesIO.getvalue())
         pipe.set(cst.STEP_LEARNER_STR, T_learner)
         pipe.execute()
-        # ONLY PART WHICH IS NOT TO REMOVE
-
-        # load_bytesIO = io.BytesIO(self.redis_servor.get(cst.MODEL_WEIGHT_STR))
-        # self.online_net.load_state_dict(torch.load(load_bytesIO, map_location='cpu'))
-        # test_state_dict_after = self.online_net.state_dict()
-        #
-        # print("we test if before and after are the same! TODO TO REMOVE")
-        # itemsbefore = list(test_state_dict_before.items())
-        # itemsafter = list(test_state_dict_after.items())
-        # assert len(itemsbefore) == len(itemsafter)
-        # for ind_item in range(len(itemsbefore)):
-        #     assert itemsbefore[ind_item][0] == itemsafter[ind_item][0]
-        #     assert int(torch.min(itemsbefore[ind_item][1] == itemsafter[ind_item][1])) == 1
 
     ########################
     #   ONLY FOR LEARNER   #
