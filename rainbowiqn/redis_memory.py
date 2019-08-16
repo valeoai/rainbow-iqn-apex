@@ -132,7 +132,7 @@ class RedisSegmentTree:
             maximum = max(maximum, current_test)
 
         end_time = time.time()
-        print("SumTree correct, time used : %f " % ((end_time - start_time)))
+        print("SumTree correct, time used : %f " % (end_time - start_time))
         print("max difference was equal to ", maximum)
 
     # We update multiple value of priorities in place indeces in the sum tree

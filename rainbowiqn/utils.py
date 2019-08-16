@@ -40,14 +40,10 @@ def _plot_line(
         length_longest_episode = Tab_longest_episode[indice_Tab][0]
         score_longest_episode = Tab_longest_episode[indice_Tab][1]
         text_learner_step.append(
-            "Longest episode last "
-            + str(length_longest_episode)
-            + " steps and score was "
-            + str(score_longest_episode)
-            + ".\n Mean length episode = "
-            + str(length_episode)
-            + ".\n Nb step learner : "
-            + "{:.2e}".format(T_learner)
+            f"Longest episode last {length_longest_episode} steps and score was "
+            f"{score_longest_episode}.\n "
+            f"Mean length episode = {length_episode}.\n "
+            f"Nb step learner : {T_learner:.2e}"
         )
 
     trace_max = Scatter(
