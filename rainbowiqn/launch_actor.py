@@ -88,15 +88,13 @@ def launch_actor(id_actor, args, redis_servor):
             if id_actor == 0 and T_actor > initial_T_actor:
                 total_reward_buffer_SABER.append(current_total_reward_SABER)
 
-                if (
-                    timestep < (5 * 60 * 60) / args.action_repeat
-                ):  # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
+                # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
+                if timestep < (5 * 60 * 60) / args.action_repeat:
                     current_total_reward_5min = current_total_reward_SABER
                 total_reward_buffer_5min.append(current_total_reward_5min)
 
-                if (
-                    timestep < (30 * 60 * 60) / args.action_repeat
-                ):  # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
+                # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
+                if timestep < (30 * 60 * 60) / args.action_repeat:
                     current_total_reward_30min = current_total_reward_SABER
                 total_reward_buffer_30min.append(current_total_reward_30min)
 
@@ -148,9 +146,7 @@ def launch_actor(id_actor, args, redis_servor):
         if T_actor % args.log_interval == 0:
             log(f"T = {T_actor} / {args.T_max}")
             duration_actor = time.time() - start_time_actor
-            print(
-                f"Time between 2 log_interval for " f"actor {id_actor} ({duration_actor:.3f} sec)"
-            )
+            print(f"Time between 2 log_interval for actor {id_actor} ({duration_actor:.3f} sec)")
             start_time_actor = time.time()
 
         if T_actor % args.weight_synchro_frequency == 0:
@@ -185,9 +181,8 @@ def launch_actor(id_actor, args, redis_servor):
             index_actor_in_memory = (
                 index_actor_in_memory + len(actor_buffer)
             ) % args.actor_capacity
-            if args.synchronize_actors_with_learner and (
-                T_actor >= step_to_start_sleep
-            ):  # Make actors sleep to wait learner if synchronization is on!
+            # Make actors sleep to wait learner if synchronization is on!
+            if args.synchronize_actors_with_learner and (T_actor >= step_to_start_sleep):
                 # Actors are always faster than learner
                 T_learner = int(redis_servor.get(cst.STEP_LEARNER_STR))
                 while (
@@ -214,90 +209,122 @@ def launch_actor(id_actor, args, redis_servor):
             and id_actor == 0
             and T_actor >= (initial_T_actor + args.evaluation_interval / 2)
         ):
-            pipe = redis_servor.pipeline()
-            pipe.get(cst.STEP_LEARNER_STR)
-            for id_actor_loop in range(args.nb_actor):
-                pipe.get(cst.STEP_ACTOR_STR + str(id_actor_loop))
-            step_all_agent = pipe.execute()
-
-            T_learner = int(
-                step_all_agent.pop(0)
-            )  # We remove first element of the list because it's the number of learner step
-            T_total_actors = 0
-            if args.nb_actor == 1:  # If only one actor, we can just get this value locally
-                T_total_actors = T_actor
-            else:
-                for nb_step_actor in step_all_agent:
-                    T_total_actors += int(nb_step_actor)
-
-            Tab_T_actors.append(T_total_actors)
-            Tab_T_learner.append(T_learner)
-
-            current_avg_episode_length = sum(episode_length_buffer) / len(episode_length_buffer)
-            Tab_length_episode.append(current_avg_episode_length)
-
-            indice_longest_episode = np.argmax(episode_length_buffer)
-            Tab_longest_episode.append(
-                (
-                    episode_length_buffer[indice_longest_episode],
-                    total_reward_buffer_SABER[indice_longest_episode],
-                )
-            )
-
-            current_avg_reward = sum(total_reward_buffer_SABER) / len(total_reward_buffer_SABER)
-
-            log(f"T = {T_total_actors} / {args.T_max} | Avg. reward: {current_avg_reward}")
-
-            tab_rewards_plot.append(list(total_reward_buffer_SABER))
-
-            # Plot
-            _plot_line(
+            current_avg_reward = dump(
+                redis_servor,
+                args,
+                T_actor,
                 Tab_T_actors,
                 Tab_T_learner,
+                episode_length_buffer,
                 Tab_length_episode,
                 Tab_longest_episode,
+                total_reward_buffer_SABER,
                 tab_rewards_plot,
-                "Reward_" + args.game,
-                path=args.path_to_results,
-            )
-
-            dump_in_csv(
-                args.path_to_results,
-                args.game,
-                T_total_actors,
-                T_learner,
                 total_reward_buffer_5min,
                 total_reward_buffer_30min,
-                total_reward_buffer_SABER,
-                episode_length_buffer,
+                actor,
+                best_avg_reward,
             )
-
-            for filename in os.listdir(args.path_to_results):
-                if "last_model_" + args.game in filename:
-                    try:
-                        os.remove(os.path.join(args.path_to_results, filename))
-                    except OSError:
-                        print(
-                            f"last_model_{args.game} were not found, "
-                            f"that's not suppose to happen..."
-                        )
-                        pass
-            actor.save(
-                args.path_to_results,
-                T_total_actors,
-                T_learner,
-                f"last_model_{args.game}_{T_total_actors}.pth",
-            )
-
-            if current_avg_reward > best_avg_reward:
-                best_avg_reward = current_avg_reward
-                actor.save(
-                    args.path_to_results, T_total_actors, T_learner, f"best_model_{args.game}.pth"
-                )
+            best_avg_reward = max(current_avg_reward, best_avg_reward)
 
         state_buffer_actor = next_state_buffer_actor
         timestep += 1
         T_actor += 1
+
+
+def dump(
+    redis_servor,
+    args,
+    T_actor,
+    Tab_T_actors,
+    Tab_T_learner,
+    episode_length_buffer,
+    Tab_length_episode,
+    Tab_longest_episode,
+    total_reward_buffer_SABER,
+    tab_rewards_plot,
+    total_reward_buffer_5min,
+    total_reward_buffer_30min,
+    actor,
+    best_avg_reward,
+):
+    pipe = redis_servor.pipeline()
+    pipe.get(cst.STEP_LEARNER_STR)
+    for id_actor_loop in range(args.nb_actor):
+        pipe.get(cst.STEP_ACTOR_STR + str(id_actor_loop))
+    step_all_agent = pipe.execute()
+
+    T_learner = int(
+        step_all_agent.pop(0)
+    )  # We remove first element of the list because it's the number of learner step
+    T_total_actors = 0
+    if args.nb_actor == 1:  # If only one actor, we can just get this value locally
+        T_total_actors = T_actor
+    else:
+        for nb_step_actor in step_all_agent:
+            T_total_actors += int(nb_step_actor)
+
+    Tab_T_actors.append(T_total_actors)
+    Tab_T_learner.append(T_learner)
+
+    current_avg_episode_length = sum(episode_length_buffer) / len(episode_length_buffer)
+    Tab_length_episode.append(current_avg_episode_length)
+
+    indice_longest_episode = np.argmax(episode_length_buffer)
+    Tab_longest_episode.append(
+        (
+            episode_length_buffer[indice_longest_episode],
+            total_reward_buffer_SABER[indice_longest_episode],
+        )
+    )
+
+    current_avg_reward = sum(total_reward_buffer_SABER) / len(total_reward_buffer_SABER)
+
+    log(f"T = {T_total_actors} / {args.T_max} | Avg. reward: {current_avg_reward}")
+
+    tab_rewards_plot.append(list(total_reward_buffer_SABER))
+
+    # Plot
+    _plot_line(
+        Tab_T_actors,
+        Tab_T_learner,
+        Tab_length_episode,
+        Tab_longest_episode,
+        tab_rewards_plot,
+        "Reward_" + args.game,
+        path=args.path_to_results,
+    )
+
+    dump_in_csv(
+        args.path_to_results,
+        args.game,
+        T_total_actors,
+        T_learner,
+        total_reward_buffer_5min,
+        total_reward_buffer_30min,
+        total_reward_buffer_SABER,
+        episode_length_buffer,
+    )
+
+    for filename in os.listdir(args.path_to_results):
+        if "last_model_" + args.game in filename:
+            try:
+                os.remove(os.path.join(args.path_to_results, filename))
+            except OSError:
+                print(
+                    f"last_model_{args.game} were not found, " f"that's not suppose to happen..."
+                )
+                pass
+    actor.save(
+        args.path_to_results,
+        T_total_actors,
+        T_learner,
+        f"last_model_{args.game}_{T_total_actors}.pth",
+    )
+
+    if current_avg_reward > best_avg_reward:
+        actor.save(args.path_to_results, T_total_actors, T_learner, f"best_model_{args.game}.pth")
+    return current_avg_reward
 
 
 def main():
