@@ -16,9 +16,10 @@ class Env:
         self.ale.setFloat("repeat_action_probability", args.proba_sticky_actions)
         self.ale.setInt("frame_skip", 0)
         self.ale.setBool("color_averaging", False)
+        # ROM loading must be done after setting options
         self.ale.loadROM(
             atari_py.get_game_path(args.game)
-        )  # ROM loading must be done after setting options
+        )
         actions = self.ale.getLegalActionSet()  # We always use 18 actions. See revisiting ALE.
         self.actions = dict([i, e] for i, e in zip(range(len(actions)), actions))
         self.window = args.history_length  # Number of frames to concatenate
@@ -27,9 +28,10 @@ class Env:
 
         self.SABER_mode = not args.disable_SABER_mode
         if self.SABER_mode:
+            # We need to divide time by action repeat to get the max_step_stuck
             self.max_step_stuck_SABER = int(
                 args.max_frame_stuck_SABER / self.action_repeat
-            )  # We need to divide time by action repeat to get the max_step_stuck
+            )
 
         # Reward on defender are really weird at the time we write this code (7 August 2019).
         # All rewards are basically multiplied by 100 and there is always a initial
