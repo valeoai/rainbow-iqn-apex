@@ -143,14 +143,13 @@ def launch_actor(id_actor, args, redis_servor):
             env_actor.render()
 
         if id_actor == 0:
-            current_total_reward_SABER += reward  # THIS should be before clipping, we want to know the true score of the game there!
-            if (
-                timestep == (5 * 60 * 60) / args.action_repeat
-            ):  # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
+            # THIS should be before clipping, we want to know the true score of the game there!
+            current_total_reward_SABER += reward
+            # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
+            if timestep == (5 * 60 * 60) / args.action_repeat:
                 current_total_reward_5min = current_total_reward_SABER
-            if (
-                timestep == (30 * 60 * 60) / args.action_repeat
-            ):  # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
+            # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
+            if timestep == (30 * 60 * 60) / args.action_repeat:
                 current_total_reward_30min = current_total_reward_SABER
 
         if args.reward_clip > 0:
@@ -167,12 +166,10 @@ def launch_actor(id_actor, args, redis_servor):
         tab_nonterminal.append(not done_actor)
 
         if T_actor % args.log_interval == 0:
-            log("T = " + str(T_actor) + " / " + str(args.T_max))
+            log(f"T = {T_actor} / {args.T_max}")
             duration_actor = time.time() - start_time_actor
             print(
-                "Time between 2 log_interval for actor "
-                + str(id_actor)
-                + " (%.3f sec)" % duration_actor
+                f"Time between 2 log_interval for " f"actor {id_actor} ({duration_actor:.3f} sec)"
             )
             start_time_actor = time.time()
 
@@ -186,7 +183,6 @@ def launch_actor(id_actor, args, redis_servor):
                 redis_servor.set(cst.IS_FULL_ACTOR_STR + str(id_actor), 1)
                 mem_actor.transitions.actor_full = True
 
-            #            start_time_test = time.time()
             priorities_buffer = actor.compute_priorities(
                 tab_state, tab_action, tab_reward, tab_nonterminal, mem_actor.priority_exponent
             )
@@ -276,14 +272,7 @@ def launch_actor(id_actor, args, redis_servor):
 
             current_avg_reward = sum(total_reward_buffer_SABER) / len(total_reward_buffer_SABER)
 
-            log(
-                "T = "
-                + str(T_total_actors)
-                + " / "
-                + str(args.T_max)
-                + " | Avg. reward: "
-                + str(current_avg_reward)
-            )
+            log(f"T = {T_total_actors} / {args.T_max} | Avg. reward: {current_avg_reward}")
 
             tab_rewards_plot.append(list(total_reward_buffer_SABER))
 
@@ -315,25 +304,21 @@ def launch_actor(id_actor, args, redis_servor):
                         os.remove(os.path.join(args.path_to_results, filename))
                     except OSError:
                         print(
-                            "last_model_"
-                            + args.game
-                            + "were not found, that's not suppose to happen..."
+                            f"last_model_{args.game} were not found, "
+                            f"that's not suppose to happen..."
                         )
                         pass
             actor.save(
                 args.path_to_results,
                 T_total_actors,
                 T_learner,
-                "last_model_" + args.game + "_" + str(T_total_actors) + ".pth",
+                f"last_model_{args.game}_{T_total_actors}.pth",
             )
 
             if current_avg_reward > best_avg_reward:
                 best_avg_reward = current_avg_reward
                 actor.save(
-                    args.path_to_results,
-                    T_total_actors,
-                    T_learner,
-                    "best_model_" + args.game + ".pth",
+                    args.path_to_results, T_total_actors, T_learner, f"best_model_{args.game}.pth"
                 )
 
         state_buffer_actor = next_state_buffer_actor
