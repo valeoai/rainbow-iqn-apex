@@ -14,6 +14,7 @@ blank_trans = Transition(0, np.zeros((84, 84), dtype=np.uint8), None, 0, False)
 
 class RedisSegmentTree:
     """Segment tree data structure where parent node values are sum of children node values"""
+
     def __init__(
         self,
         actor_capacity,
@@ -509,7 +510,7 @@ class ReplayRedisMemory:
         for transition in tab_transitions:
             state = np.stack([trans.state for trans in transition[:history_length]])
             next_state = np.stack(
-                [trans.state for trans in transition[self.n: self.n + self.history]]
+                [trans.state for trans in transition[self.n : self.n + self.history]]
             )
 
             # Calculate truncated n-step discounted return R^n = Σ_k=0->n-1

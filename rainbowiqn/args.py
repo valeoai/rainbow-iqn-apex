@@ -262,9 +262,11 @@ def return_args():
         "reproducibility but we recommend to remove it if using more than 4 actors",
     )
     parser.add_argument(
-        "--path-to-results", type=str, default=None,
+        "--path-to-results",
+        type=str,
+        default=None,
         help="Path to the results folder to store the results file. This is also used to resume"
-             "a stopped experiment (default is results folder in project root)"
+        "a stopped experiment (default is results folder in project root)",
     )
     # Setup
     args = parser.parse_args()
@@ -290,17 +292,18 @@ def return_args():
         print(" " * 26 + k + ": " + str(v))
 
     if args.path_to_results is None:
-        args.path_to_results = os.path.join(os.path.dirname(os.path.dirname(
-            os.path.realpath(__file__))), "results")
+        args.path_to_results = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "results"
+        )
 
     last_model = None
     for filename in os.listdir(args.path_to_results):
         if "last_model_" + args.game in filename:
             last_model = os.path.join(args.path_to_results, filename)
             # Always load tensors onto CPU by default, will shift to GPU if necessary
-            checkpoint = torch.load(last_model, map_location='cpu')
-            step_actors_already_done = checkpoint['T_actors']
-            step_learner_already_done = checkpoint['T_learner']
+            checkpoint = torch.load(last_model, map_location="cpu")
+            step_actors_already_done = checkpoint["T_actors"]
+            step_learner_already_done = checkpoint["T_learner"]
             break
     if last_model:
         args.continue_experiment = True
@@ -309,10 +312,16 @@ def return_args():
             "this will override the --model parameter"
         )
 
-        print("We found the filename " + last_model + " to restart, number of step actor already "
-                                                      "done is ", step_actors_already_done)
-        print("We found the filename " + last_model + " to restart, number of step learner already"
-                                                      " done is ", step_learner_already_done)
+        print(
+            "We found the filename " + last_model + " to restart, number of step actor already "
+            "done is ",
+            step_actors_already_done,
+        )
+        print(
+            "We found the filename " + last_model + " to restart, number of step learner already"
+            " done is ",
+            step_learner_already_done,
+        )
 
         args.step_actors_already_done = step_actors_already_done
         args.step_learner_already_done = step_learner_already_done
@@ -356,7 +365,9 @@ def return_args():
     if args.rainbow_only:
         print("Launching an experiment with Rainbow only (i.e. C51 instead of IQN)")
     else:
-        print("Launching an experiment with Rainbow IQN (you can disable"
-              " IQN by using --rainbow-only True)")
+        print(
+            "Launching an experiment with Rainbow IQN (you can disable"
+            " IQN by using --rainbow-only True)"
+        )
 
     return args

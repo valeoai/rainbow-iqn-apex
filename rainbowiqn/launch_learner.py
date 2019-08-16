@@ -43,16 +43,16 @@ def sample_in_thread(mp_queue_sample, mem_redis, batchsize, queue_size):
                 [
                     tree_idxs[
                         sample_factor_iter
-                        * step_tree_idxs: (sample_factor_iter + 1)
+                        * step_tree_idxs : (sample_factor_iter + 1)
                         * step_tree_idxs
                     ],
                     tab_byte_transition[
                         sample_factor_iter
-                        * step_tab_byte_transition: (sample_factor_iter + 1)
+                        * step_tab_byte_transition : (sample_factor_iter + 1)
                         * step_tab_byte_transition
                     ],
                     weights[
-                        sample_factor_iter * step_weights: (sample_factor_iter + 1) * step_weights
+                        sample_factor_iter * step_weights : (sample_factor_iter + 1) * step_weights
                     ],
                 ]
             )
@@ -136,7 +136,7 @@ while T < args.T_max:
     if T % args.log_interval == 0:
         log("T = " + str(T) + " / " + str(args.T_max))
         duration = time.time() - start_time
-        print("Time between 2 log_interval for learner (%.3f sec)" % (duration))
+        print("Time between 2 log_interval for learner (%.3f sec)" % duration)
         start_time = time.time()
 
     # Train and test
@@ -186,12 +186,12 @@ while T < args.T_max:
                         [
                             tab_idxs[
                                 batch_priorities_iter
-                                * args.batch_size: (batch_priorities_iter + 1)
+                                * args.batch_size : (batch_priorities_iter + 1)
                                 * args.batch_size
                             ],
                             tab_priorities_cpu[
                                 batch_priorities_iter
-                                * args.batch_size: (batch_priorities_iter + 1)
+                                * args.batch_size : (batch_priorities_iter + 1)
                                 * args.batch_size
                             ],
                         ]

@@ -53,8 +53,9 @@ def launch_actor(id_actor, args, redis_servor):
             + str(args.step_actors_already_done)
             + "steps"
         )
-        initial_T_actor = int((args.step_actors_already_done
-                               - args.memory_capacity) / args.nb_actor)
+        initial_T_actor = int(
+            (args.step_actors_already_done - args.memory_capacity) / args.nb_actor
+        )
         print("initial T actor equal ", initial_T_actor)
         step_to_start_sleep = int(args.step_actors_already_done / args.nb_actor)
     else:
@@ -139,9 +140,7 @@ def launch_actor(id_actor, args, redis_servor):
             env_actor.render()
 
         if id_actor == 0:
-            current_total_reward_SABER += (
-                reward
-            )  # THIS should be before clipping, we want to know the true score of the game there!
+            current_total_reward_SABER += reward  # THIS should be before clipping, we want to know the true score of the game there!
             if (
                 timestep == (5 * 60 * 60) / args.action_repeat
             ):  # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
@@ -240,7 +239,7 @@ def launch_actor(id_actor, args, redis_servor):
         if (
             T_actor % (args.evaluation_interval / args.nb_actor) == 0
             and id_actor == 0
-            and T_actor >= (initial_T_actor + args.evaluation_interval/2)
+            and T_actor >= (initial_T_actor + args.evaluation_interval / 2)
         ):
             pipe = redis_servor.pipeline()
             pipe.get(cst.STEP_LEARNER_STR)
@@ -252,9 +251,7 @@ def launch_actor(id_actor, args, redis_servor):
                 step_all_agent.pop(0)
             )  # We remove first element of the list because it's the number of learner step
             T_total_actors = 0
-            if (
-                args.nb_actor == 1
-            ):  # If only one actor, we can just get this value locally
+            if args.nb_actor == 1:  # If only one actor, we can just get this value locally
                 T_total_actors = T_actor
             else:
                 for nb_step_actor in step_all_agent:
@@ -320,14 +317,21 @@ def launch_actor(id_actor, args, redis_servor):
                             + "were not found, that's not suppose to happen..."
                         )
                         pass
-            actor.save(args.path_to_results, T_total_actors, T_learner,
-                       "last_model_" + args.game +
-                       "_" + str(T_total_actors) + ".pth")
+            actor.save(
+                args.path_to_results,
+                T_total_actors,
+                T_learner,
+                "last_model_" + args.game + "_" + str(T_total_actors) + ".pth",
+            )
 
             if current_avg_reward > best_avg_reward:
                 best_avg_reward = current_avg_reward
-                actor.save(args.path_to_results, T_total_actors, T_learner,
-                           "best_model_" + args.game + ".pth")
+                actor.save(
+                    args.path_to_results,
+                    T_total_actors,
+                    T_learner,
+                    "best_model_" + args.game + ".pth",
+                )
 
         state_buffer_actor = next_state_buffer_actor
         timestep += 1

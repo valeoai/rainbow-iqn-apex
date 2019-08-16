@@ -31,8 +31,8 @@ class Agent:  # This class handle both actor and learner because most of their m
             if os.path.isfile(args.model):
                 print("We loaded model ", args.model)
                 # Always load tensors onto CPU by default, will shift to GPU if necessary
-                checkpoint = torch.load(args.model, map_location='cpu')
-                self.online_net.load_state_dict(checkpoint['model_state_dict'])
+                checkpoint = torch.load(args.model, map_location="cpu")
+                self.online_net.load_state_dict(checkpoint["model_state_dict"])
             else:
                 print("We didn't fint the model you gave as input!")
                 raise Exception
@@ -48,7 +48,7 @@ class Agent:  # This class handle both actor and learner because most of their m
 
         if args.model:
             # We already loaded the checkpoint there, no need to load it again
-            self.optimiser.load_state_dict(checkpoint['optimiser_state_dict'])
+            self.optimiser.load_state_dict(checkpoint["optimiser_state_dict"])
 
         self.rainbow_only = args.rainbow_only
 
@@ -149,7 +149,9 @@ class Agent:  # This class handle both actor and learner because most of their m
                 # there in both case (actor or learner)          #
                 ##################################################
 
-            loss = -torch.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimise DKL(m||p(s_t, a_t)))
+            loss = -(
+                torch.sum(m * log_ps_a, 1)
+            )  # Cross-entropy loss (minimise DKL(m||p(s_t, a_t)))
 
         else:  # IQN loss
             loss = compute_loss_iqn.compute_loss_actor_or_learner_iqn(
@@ -192,11 +194,15 @@ class Agent:  # This class handle both actor and learner because most of their m
     # Save model parameters on results folder (or on --path-to-results given)
     def save(self, path, T_actors, T_learner, name):
         # torch.save(self.online_net.state_dict(), os.path.join(path, name))
-        torch.save({
-            'T_actors': T_actors,
-            'T_learner': T_learner,
-            'model_state_dict': self.online_net.state_dict(),
-            'optimiser_state_dict': self.optimiser.state_dict()}, os.path.join(path, name))
+        torch.save(
+            {
+                "T_actors": T_actors,
+                "T_learner": T_learner,
+                "model_state_dict": self.online_net.state_dict(),
+                "optimiser_state_dict": self.optimiser.state_dict(),
+            },
+            os.path.join(path, name),
+        )
 
     def train(self):
         self.online_net.train()
@@ -260,14 +266,14 @@ class Agent:  # This class handle both actor and learner because most of their m
             == len(tab_state) - self.history + 1
         )
 
-        tab_nonterminal = np.float32(tab_nonterminal[self.n:])
+        tab_nonterminal = np.float32(tab_nonterminal[self.n :])
 
         # Handling the case near a terminal state, indeed by construction the n-step states before
         # this terminal state are considered as terminal too (we want to know if in n-step the
         # episode will be already ended or not)
         current_term_indices = np.where(tab_nonterminal == 0)[0]
         for indice in current_term_indices:
-            tab_nonterminal[indice + 1: (indice + self.n + 1)] = 0
+            tab_nonterminal[indice + 1 : (indice + self.n + 1)] = 0
 
         actions = torch.tensor(
             tab_action[: len_buffer - self.n], dtype=torch.int64, device=self.device
@@ -288,10 +294,10 @@ class Agent:  # This class handle both actor and learner because most of their m
             tab_current_next_state = []
 
             for current_sub_indice in range(current_begin, current_end):
-                state = np.stack(tab_state[current_sub_indice: current_sub_indice + self.history])
+                state = np.stack(tab_state[current_sub_indice : current_sub_indice + self.history])
                 next_state = np.stack(
                     tab_state[
-                        current_sub_indice + self.n: current_sub_indice + self.history + self.n
+                        current_sub_indice + self.n : current_sub_indice + self.history + self.n
                     ]
                 )
 
