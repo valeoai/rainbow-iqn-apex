@@ -45,9 +45,7 @@ def test_multiple_seed(args, debug=False):
                 true_RL_reward_sum = 0
 
             # Choose an action ε-greedily
-            action = tester.act_e_greedy(
-                state_buffer, epsilon=epsilon
-            )
+            action = tester.act_e_greedy(state_buffer, epsilon=epsilon)
             state_buffer, reward, done = env.step(action)  # Step
 
             # current_image = state_buffer[-1]
@@ -57,9 +55,7 @@ def test_multiple_seed(args, debug=False):
                 tester.reset_noise()  # Draw a new set of noisy weights
 
             # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
-            if step == int(
-                5 * 60 * 60 / args.action_repeat
-            ):  
+            if step == int(5 * 60 * 60 / args.action_repeat):
                 T_rewards_5minutes.append(reward_sum)
 
             reward_sum += reward
