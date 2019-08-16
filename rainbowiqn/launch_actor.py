@@ -33,7 +33,10 @@ def log(s):
 # Send actor buffer experience to main memory
 def send_actor_buffer(
     actor_buffer, actor_index_in_replay_memory, id_actor, mem_actor, priorities, T_actor
-):  # actor_index_in_replay_memory is the index in the memory where to start appending next buffer
+):
+    """actor_index_in_replay_memory is the index
+    in the memory where to start appending next buffer
+    """
     mem_actor.transitions.append_actor_buffer(
         actor_buffer, actor_index_in_replay_memory, id_actor, priorities, T_actor
     )
