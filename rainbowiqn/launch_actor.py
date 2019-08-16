@@ -212,7 +212,7 @@ def launch_actor(id_actor, args, redis_servor):
             index_actor_in_memory = (
                 index_actor_in_memory + len(actor_buffer)
             ) % args.actor_capacity
-            if (args.synchronize_actors_with_learner) and (
+            if args.synchronize_actors_with_learner and (
                 T_actor >= step_to_start_sleep
             ):  # Make actors sleep to wait learner if synchronization is on!
                 # Actors are always faster than learner
