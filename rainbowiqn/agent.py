@@ -9,7 +9,7 @@ from rainbowiqn.model import DQN
 import io
 import math
 
-import rainbowiqn.CONSTANTS as CST
+import rainbowiqn.constants as cst
 import rainbowiqn.compute_loss_iqn as compute_loss_iqn
 
 
@@ -212,12 +212,12 @@ class Agent:  # This class handle both actor and learner because most of their m
         save_bytesIO = io.BytesIO()
         torch.save(self.online_net.state_dict(), save_bytesIO)
         pipe = self.redis_servor.pipeline()
-        pipe.set(CST.MODEL_WEIGHT_STR, save_bytesIO.getvalue())
-        pipe.set(CST.STEP_LEARNER_STR, T_learner)
+        pipe.set(cst.MODEL_WEIGHT_STR, save_bytesIO.getvalue())
+        pipe.set(cst.STEP_LEARNER_STR, T_learner)
         pipe.execute()
         # ONLY PART WHICH IS NOT TO REMOVE
 
-        # load_bytesIO = io.BytesIO(self.redis_servor.get(CST.MODEL_WEIGHT_STR))
+        # load_bytesIO = io.BytesIO(self.redis_servor.get(cst.MODEL_WEIGHT_STR))
         # self.online_net.load_state_dict(torch.load(load_bytesIO, map_location='cpu'))
         # test_state_dict_after = self.online_net.state_dict()
         #
@@ -239,7 +239,7 @@ class Agent:  # This class handle both actor and learner because most of their m
 
     # Load weight from redis database
     def load_weight_from_redis(self):
-        load_bytesIO = io.BytesIO(self.redis_servor.get(CST.MODEL_WEIGHT_STR))
+        load_bytesIO = io.BytesIO(self.redis_servor.get(cst.MODEL_WEIGHT_STR))
         self.online_net.load_state_dict(torch.load(load_bytesIO, map_location="cpu"))
 
     # Compute priorities before sending experience to redis replay

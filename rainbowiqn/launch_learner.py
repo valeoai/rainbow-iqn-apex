@@ -19,7 +19,7 @@ import torch
 import numpy as np
 import os
 
-import rainbowiqn.CONSTANTS as CST
+import rainbowiqn.constants as cst
 
 
 # Simple ISO 8601 timestamped logger
@@ -164,7 +164,7 @@ while T < args.T_max:
             p.start()
 
         # Just a small hack to set memory_full to True because now we sample in another Thread...
-        if T % CST.hack_set_full_capacity_to_true == 0:
+        if T % cst.hack_set_full_capacity_to_true == 0:
             mem_learner.transitions.get_current_capacity()
 
         mem_learner.priority_weight = min(
