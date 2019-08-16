@@ -109,12 +109,12 @@ def launch_actor(id_actor, args, redis_servor):
         if T_actor % args.replay_frequency == 0:
             actor.reset_noise()  # Draw a new set of noisy weights
 
-        if T_actor < args.learn_start / args.nb_actor:  # Do random actions before learning start
+        if T_actor < args.learn_start / args.nb_actor:
+            # Do random actions before learning start
             action = random.randint(0, env_actor.action_space() - 1)
         else:
-            action = actor.act(
-                state_buffer_actor
-            )  # Choose an action greedily (with noisy weights)
+            # Choose an action greedily (with noisy weights)
+            action = actor.act(state_buffer_actor)
 
         next_state_buffer_actor, reward, done_actor = env_actor.step(action)  # Step
         if args.render and id_actor == 0:
