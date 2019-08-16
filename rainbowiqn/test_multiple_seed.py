@@ -85,9 +85,8 @@ def test_multiple_seed(args, debug=False):
                     #       true_RL_reward_sum)
                 T_rewards.append(reward_sum)
                 T_true_RL_reward.append(true_RL_reward_sum)
-                if step <= int(
-                    5 * 60 * 60 / args.action_repeat
-                ):  # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
+                # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
+                if step <= int(5 * 60 * 60 / args.action_repeat):
                     T_rewards_5minutes.append(reward_sum)
                 break
     env.close()
