@@ -1,6 +1,7 @@
 Rainbow-IQN Ape-X :
 =======
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
+
+License: Apache 2.0
 
 Rainbow-IQN Ape-X is a new distributed state-of-the-art algorithm on Atari coming
 from the combination of the 3 following papers:<br/>
