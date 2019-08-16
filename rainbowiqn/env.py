@@ -78,6 +78,8 @@ class Env:
         observation = np.max(frame_buffer, axis=0)
         self.state_buffer.append(observation)
 
+        # In SABER mode we track how much time without receiving any rewards
+        # If stuck for more than 5 minutes, we end the episode
         if self.SABER_mode:
             if reward == 0:
                 self.SABER_mode_count += 1
@@ -85,9 +87,11 @@ class Env:
                 self.SABER_mode_count = 0
 
             if self.SABER_mode_count > self.max_step_stuck_SABER:
+                # We didn't receive any reward for 5 minutes, probably game stuck.
+                # Let's end this episode
                 done = True
 
-        # HANDLING BUG ON REWARD, particulary on defender!
+        # HANDLING BUG ON REWARD, particularly on defender!
         # This is specific to defender
         if self.handle_bug_in_defender:
             if reward < -1:

@@ -34,6 +34,7 @@ def sample_in_thread(mp_queue_sample, mem_redis, batchsize, queue_size):
         step_tree_idxs = int(len(tree_idxs) / sample_factor)
         step_tab_byte_transition = int(len(tab_byte_transition) / sample_factor)
         step_weights = int(len(weights) / sample_factor)
+
         for sample_factor_iter in range(sample_factor):
 
             mp_queue_sample.put(

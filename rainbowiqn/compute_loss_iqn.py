@@ -229,8 +229,6 @@ def compute_loss_actor_or_learner_iqn(agent, states, actions, returns, next_stat
         gamma_with_terminal = (agent.discount ** agent.n) * nonterminals[:, None]
         gamma_with_terminal = gamma_with_terminal.repeat([agent.num_tau_prime_samples, 1])
 
-        #            print("gamma_with_terminal.shape = ", gamma_with_terminal.shape)
-
         # Compute target quantiles values Q(s_t+n, num_quantile_samples; θonline)
         # We used online_net there because we use double DQN
         agent.online_net.reset_noise()
@@ -242,11 +240,9 @@ def compute_loss_actor_or_learner_iqn(agent, states, actions, returns, next_stat
         )
 
         replay_net_target_q_values = torch.mean(target_quantile_values_action, dim=0)
-        #            print("replay_net_target_q_values.shape = ", replay_net_target_q_values.shape)
 
         # Perform argmax action selection using online network: argmax_a[Q(s_t+n; θonline)]
         replay_next_qt_argmax = torch.argmax(replay_net_target_q_values, dim=1)
-        #            print("replay_next_qt_argmax.shape = ", replay_next_qt_argmax.shape)
 
         # Shape of replay_next_qt_argmax will be (num_tau_prime_samples x batch_size) x 1
         replay_next_qt_argmax = replay_next_qt_argmax[:, None].repeat(
@@ -353,6 +349,7 @@ def compute_loss_actor_or_learner_iqn(agent, states, actions, returns, next_stat
     # average over target quantile value (num_tau_prime_samples) dimension.
     # Shape: batch_size x num_tau_prime_samples x 1.
     loss = torch.sum(quantile_huber_loss, dim=2)
+
     # Shape: batch_size x 1.
     loss = torch.mean(loss, dim=1)
 
