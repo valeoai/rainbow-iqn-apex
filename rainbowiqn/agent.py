@@ -13,7 +13,9 @@ import rainbowiqn.constants as cst
 import rainbowiqn.compute_loss_iqn as compute_loss_iqn
 
 
-class Agent:  # This class handle both actor and learner because most of their methods are shared
+class Agent:
+    """This class handle both actor and learner because most of their methods are shared"""
+
     def __init__(self, args, action_space, redis_servor):
         self.action_space = action_space
 
@@ -177,7 +179,6 @@ class Agent:  # This class handle both actor and learner because most of their m
 
         return idxs, loss
 
-        # priorities = loss.detach().cpu().numpy()
         #
         # return idxs, priorities
 
