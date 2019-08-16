@@ -129,7 +129,6 @@ class RedisSegmentTree:
             current_test = abs(float(b_left) + float(b_right) - float(b_parent))
             if current_test > 1e-1:
                 print("PROBLEM WITH SUMTREE at index ", index_test)
-            # assert current_test <= 1e-1  # SOMETIMES BUG WITH FLOAT CONVERSION...
             maximum = max(maximum, current_test)
 
         end_time = time.time()
@@ -158,7 +157,6 @@ class RedisSegmentTree:
         This function add the actor buffer (consisting of multiple consecutive transitions)
         at the right location in the redis-servor
         """
-        # print("append some data to redis servor")
         indexes = (
             np.arange(
                 actor_index_in_replay_memory, actor_index_in_replay_memory + len(actor_buffer)
@@ -198,9 +196,8 @@ class RedisSegmentTree:
 
         pipe.set(cst.INDEX_ACTOR_STR + str(id_actor), actor_index_in_replay_memory)
         pipe.set(cst.STEP_ACTOR_STR + str(id_actor), T_actor)
-        # self.data[self.index] = data  # Store data in underlying data structure
-
         pipe.execute()
+
         if self.synchronise_actors_with_learner:
             redlock_manager.unlock(red_lock)
         # print("retry_count append_actor_buffer = ", retry_count)
@@ -217,11 +214,6 @@ class RedisSegmentTree:
 
         tab_b_sum_tree_left = pipe.execute()
         for current_indice in range(len(tab_b_sum_tree_left)):
-            # if lefts[current_indice] >= 2 * self.full_capacity - 1:
-            #     indexes[current_indice] = indexes[current_indice]
-            # else:
-            # This comment is useless but it explains well that if we are currently
-            # over the size, we don't want to do anything
 
             # This correct a bug when the tree is not a exact 2^n number, YOU DONT ITERATE
             # same number of time for each index (think about a small example with size = 5,
@@ -342,8 +334,6 @@ class RedisSegmentTree:
 
     def total(self):
         b_sum_tree_total = self.redis_servor.get(cst.PRIORITIES_STR + str(0))
-        # print("b_sum_tree_total = ", b_sum_tree_total)
-        # print("float(b_sum_tree_total) = ", float(b_sum_tree_total))
         return float(b_sum_tree_total)
 
     def _byte_data_to_transition(self, b_data):
@@ -382,7 +372,7 @@ class RedisSegmentTree:
 
     def get_current_capacity(self):
         if self.memory_full:
-            # print("memory is full so we return full capacity")
+            # memory is full so we return full capacity without computation
             return self.full_capacity
         pipe = self.redis_servor.pipeline()
         is_memory_full = True
@@ -399,7 +389,6 @@ class RedisSegmentTree:
                 capacity += int(tab_b_full_index_actor[2 * id_actor + 1])
                 is_memory_full = False
         self.memory_full = is_memory_full
-        # print("memory is not full so we return current capacity equal to ", capacity)
         return capacity
 
 
@@ -435,7 +424,6 @@ class ReplayRedisMemory:
 
     # Returns a valid sample from all segments in form of byte (to be added to the redis-servor)
     def _get_byte_sample_from_all_segment(self, batch_size):
-        # start_time_test = time.time()
 
         tab_probs, data_indexes, tree_indexes, p_total = self.transitions.find_multiple_values(
             self.history, self.n, batch_size
@@ -449,10 +437,6 @@ class ReplayRedisMemory:
             tab_probs, data_indexes, tree_indexes, p_total = self.transitions.find_multiple_values(
                 self.history, self.n, batch_size
             )
-
-        # duration_test = time.time() - start_time_test
-        # print('Time in find_multiple_values = (%.3f sec)' % (duration_test))
-        # start_time_test = time.time()
 
         tab_byte_transition = self.transitions.get_byte_multiple_transition(
             data_indexes, self.history, self.n
@@ -470,9 +454,6 @@ class ReplayRedisMemory:
             capacity * probs
         ) ** -self.priority_weight  # Compute importance-sampling weights w
         weights = weights / weights.max()  # Normalise by max importance-sampling weight from batch
-
-        # if np.min(probs) <= 0:
-        #     print("it's weird")
 
         return tree_idxs, tab_byte_transition, weights
 

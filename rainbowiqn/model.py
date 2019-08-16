@@ -146,17 +146,13 @@ class DQN(nn.Module):
             quantile_net = F.relu(quantile_net)
 
             x = x.repeat(num_quantiles, 1)
-            # print("x.shape after repeat = ", x.shape)
 
             x = x * quantile_net
-            # print("x.shape after multiply = ", x.shape)
 
             v = self.fcnoisy_z_v(F.relu(self.fcnoisy_h_v(x)))  # Value stream
             a = self.fcnoisy_z_a(F.relu(self.fcnoisy_h_a(x)))  # Advantage stream
 
             q = v + a - a.mean(1, keepdim=True)  # Combine streams
-            # print("q.shape = ", q.shape)
-            # print("quantiles.shape = ", quantiles.shape)
             return q, quantiles
 
     def reset_noise(self):

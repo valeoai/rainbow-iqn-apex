@@ -329,10 +329,6 @@ def return_args():
     else:
         args.continue_experiment = False
 
-    # print("we try multiply original batch size (32) by number of actor
-    # args.batch_size = args.batch_size * args.nb_actor
-    # print("args.batch_size = ", args.batch_size)
-
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_number)
 
     args.seed = args.seed + args.id_actor

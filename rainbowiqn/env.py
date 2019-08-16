@@ -33,6 +33,8 @@ class Env:
         # All rewards are basically multiplied by 100 and there is always a initial
         # reward of 10 both for no reason
         if args.game == "defender":
+            print("We are using defender game, let's handle the bug on the reward (at least"
+                  " on the current version of ALE (0.1.1)")
             self.handle_bug_in_defender = True
         else:
             self.handle_bug_in_defender = False
@@ -78,6 +80,8 @@ class Env:
         observation = np.max(frame_buffer, axis=0)
         self.state_buffer.append(observation)
 
+        # In SABER mode we track how much time without receiving any rewards
+        # If stuck for more than 5 minutes, we end the episode
         if self.SABER_mode:
             if reward == 0:
                 self.SABER_mode_count += 1
@@ -85,13 +89,11 @@ class Env:
                 self.SABER_mode_count = 0
 
             if self.SABER_mode_count > self.max_step_stuck_SABER:
-                # print(
-                #     "We didn't receive any reward for 5 minutes, probably game stuck, "
-                #     "let's end this episode"
-                # )
+                # We didn't receive any reward for 5 minutes, probably game stuck.
+                # Let's end this episode
                 done = True
 
-        # HANDLING BUG ON REWARD, particulary on defender!
+        # HANDLING BUG ON REWARD, particularly on defender!
         # This is specific to defender
         if self.handle_bug_in_defender:
             if reward < -1:
