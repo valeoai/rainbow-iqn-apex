@@ -19,7 +19,7 @@ class Env:
         # ROM loading must be done after setting options
         self.ale.loadROM(atari_py.get_game_path(args.game))
         actions = self.ale.getLegalActionSet()  # We always use 18 actions. See revisiting ALE.
-        self.actions = dict([i, e] for i, e in zip(range(len(actions)), actions))
+        self.actions = {i: e for i, e in zip(range(len(actions)), actions)}
         self.window = args.history_length  # Number of frames to concatenate
         self.state_buffer = deque([], maxlen=args.history_length)
         self.action_repeat = args.action_repeat
