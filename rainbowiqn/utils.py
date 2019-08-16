@@ -1,9 +1,10 @@
+import csv
 import os
+
 import plotly
+import torch
 from plotly.graph_objs import Scatter
 from plotly.graph_objs.scatter import Line
-import torch
-import csv
 
 
 # Plots min, max and mean + standard deviation bars of a population over time

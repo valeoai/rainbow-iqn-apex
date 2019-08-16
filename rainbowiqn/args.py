@@ -1,7 +1,8 @@
 import argparse
-import random
-import torch
 import os
+import random
+
+import torch
 
 
 def return_args():

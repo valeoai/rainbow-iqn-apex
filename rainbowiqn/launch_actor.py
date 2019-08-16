@@ -1,28 +1,20 @@
+import logging
+import os
+import random
 import time
+from collections import deque
 from datetime import datetime
 
-from rainbowiqn.env import Env
-
-from rainbowiqn.redis_memory import ReplayRedisMemory
-
-from rainbowiqn.agent import Agent
-
+import numpy as np
+import redis
 from torch.multiprocessing import Process
 
-import redis
-import logging
-from rainbowiqn.args import return_args
-
-import numpy as np
-
 import rainbowiqn.constants as cst
-
-from collections import deque
-
+from rainbowiqn.agent import Agent
+from rainbowiqn.args import return_args
+from rainbowiqn.env import Env
+from rainbowiqn.redis_memory import ReplayRedisMemory
 from rainbowiqn.utils import _plot_line, dump_in_csv
-import random
-
-import os
 
 
 # Simple ISO 8601 timestamped logger

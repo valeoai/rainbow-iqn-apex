@@ -1,9 +1,8 @@
-from collections import deque
-import atari_py
 import math
+from collections import deque
 
+import atari_py
 import cv2  # Note that importing cv2 before torch may cause segfaults?
-
 import numpy as np
 
 

@@ -1,16 +1,15 @@
-import os
-import random
-import torch
-from torch import optim
-import numpy as np
-
-from rainbowiqn.model import DQN
-
 import io
 import math
+import os
+import random
 
-import rainbowiqn.constants as cst
+import numpy as np
+import torch
+from torch import optim
+
 import rainbowiqn.compute_loss_iqn as compute_loss_iqn
+import rainbowiqn.constants as cst
+from rainbowiqn.model import DQN
 
 
 class Agent:

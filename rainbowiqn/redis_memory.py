@@ -1,12 +1,12 @@
 import random
-from collections import namedtuple
-import torch
-import numpy as np
 import time
-import rainbowiqn.constants as cst
+from collections import namedtuple
 
+import numpy as np
 import redlock
+import torch
 
+import rainbowiqn.constants as cst
 
 Transition = namedtuple("Transition", ("timestep", "state", "action", "reward", "nonterminal"))
 blank_trans = Transition(0, np.zeros((84, 84), dtype=np.uint8), None, 0, False)

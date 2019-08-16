@@ -7,17 +7,14 @@ Created on Wed Nov 21 12:20:12 2018
 """
 
 import random
+import time
+
+import numpy as np
 import torch
 
-from rainbowiqn.env import Env
-
 from rainbowiqn.agent import Agent
-
-
 from rainbowiqn.args import return_args
-
-import time
-import numpy as np
+from rainbowiqn.env import Env
 
 
 # Test the input snapshot (args --model)
