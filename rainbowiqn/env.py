@@ -33,8 +33,6 @@ class Env:
         # All rewards are basically multiplied by 100 and there is always a initial
         # reward of 10 both for no reason
         if args.game == "defender":
-            print("We are using defender game, let's handle the bug on the reward (at least"
-                  " on the current version of ALE (0.1.1)")
             self.handle_bug_in_defender = True
         else:
             self.handle_bug_in_defender = False

@@ -200,7 +200,6 @@ class RedisSegmentTree:
 
         if self.synchronise_actors_with_learner:
             redlock_manager.unlock(red_lock)
-        # print("retry_count append_actor_buffer = ", retry_count)
 
     # Searches for the location of a value in sum tree
     def _retrieve_multiple_values(self, indexes, values):
@@ -323,7 +322,6 @@ class RedisSegmentTree:
 
         if self.synchronise_actors_with_learner:
             redlock_manager.unlock(red_lock)
-        # print("retry_count find_multiple_values = ", retry_count)
 
         return (
             tab_value_priorities,
@@ -554,4 +552,3 @@ class ReplayRedisMemory:
 
         if self.transitions.synchronise_actors_with_learner:
             redlock_manager.unlock(red_lock)
-        # print("retry_count update_multiple_value = ", retry_count)

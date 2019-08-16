@@ -63,9 +63,7 @@ def test_multiple_seed(args, debug=False):
             if debug and step % 5000 == 0:
                 time.sleep(0.1)
                 print("step = ", step)
-                # print("reward = ", reward)
                 print("reward_sum = ", reward_sum)
-                # print("true_RL_reward_sum = ", true_RL_reward_sum)
 
             if args.render:
                 env.render()
@@ -80,9 +78,6 @@ def test_multiple_seed(args, debug=False):
                         + " = ",
                         reward_sum,
                     )
-                    # print("Episode terminated after " + str(step) + " steps.
-                    # true_RL_reward_sum episode " + str(episode_number) + " = ",
-                    #       true_RL_reward_sum)
                 T_rewards.append(reward_sum)
                 T_true_RL_reward.append(true_RL_reward_sum)
                 # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
