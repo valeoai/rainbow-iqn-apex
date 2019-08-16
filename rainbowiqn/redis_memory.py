@@ -12,8 +12,8 @@ Transition = namedtuple("Transition", ("timestep", "state", "action", "reward", 
 blank_trans = Transition(0, np.zeros((84, 84), dtype=np.uint8), None, 0, False)
 
 
-# Segment tree data structure where parent node values are sum of children node values
 class RedisSegmentTree:
+    """Segment tree data structure where parent node values are sum of children node values"""
     def __init__(
         self,
         actor_capacity,
@@ -44,9 +44,10 @@ class RedisSegmentTree:
             time.sleep(cst.RETRY_DELAY)
         return red_lock, redlock_manager
 
-    def acquire_redlock_debug(
-        self
-    ):  # ADD A cst.RETRY_COUNT ONLY FOR DEBUG, TOO SEE HOW MUCH TIME LOCK IS TRYING TO BE ACQUIRE
+    def acquire_redlock_debug(self):
+        """ADD A cst.RETRY_COUNT ONLY FOR DEBUG, TOO SEE HOW
+        MUCH TIME LOCK IS TRYING TO BE ACQUIRE
+        """
         red_lock = False
         retry_count = 0
         redlock_manager = self.redlock_manager
@@ -56,12 +57,15 @@ class RedisSegmentTree:
             retry_count += 1
         return red_lock, redlock_manager, retry_count
 
-    # This fonction is called once at the beginning of the training, it initialized the redis
-    # memory with all priorities to 0, the step for each actor to 0 and the step for learner to 0.
-    # The max priority is not important. We set it to 1 and is used only for the few transitions
-    # from actors that we can't compute priorities (because we reach end of the buffer
-    # and we don't get the n-next steps)
     def initialize_redis_database(self):
+        """
+        This fonction is called once at the beginning of the training, it initialized the redis
+        memory with all priorities to 0, the step for each actor to 0
+        and the step for learner to 0. The max priority is not important.
+        We set it to 1 and is used only for the few transitions
+        from actors that we can't compute priorities (because we reach end of the buffer
+        and we don't get the n-next steps)
+        """
         redis_servor = self.redis_servor
         print("we flush the database! This destroy everything in redis-memory")
         redis_servor.flushdb()
@@ -86,8 +90,8 @@ class RedisSegmentTree:
             % (end_time - start_time)
         )
 
-    # Propagates multiple values up tree given a list of tree indexes
     def _propagate_multiple_values(self, pipe, indexes, diff_values):
+        """Propagates multiple values up tree given a list of tree indexes"""
         while np.max(indexes) > 0:
             for current_indice in range(len(indexes)):
                 index = indexes[current_indice]
@@ -99,9 +103,12 @@ class RedisSegmentTree:
             cst.PRIORITIES_STR + str(0), np.sum(diff_values)
         )  # Index is 0 there... we update the root of the sumtree
 
-    # We check if sumtree is correct! This is not used in the code but it's a good way to debug.
-    # Sumtree nodes should be sum of child nodes
     def check_sumtree_correct(self):
+        """
+        We check if sumtree is correct! This is not used in the
+        code but it's a good way to debug.
+        Sumtree nodes should be sum of child nodes
+        """
         print("we check if SumTree is correct, TODO TO REMOVE")
         start_time = time.time()
 
@@ -143,11 +150,13 @@ class RedisSegmentTree:
         if np.float64(max(priorities)) > np.float64(b_max):
             pipe.set(cst.MAX_PRIORITY_STR, np.float64(max(priorities)))
 
-    # This function add the actor buffer (consisting of multiple consecutive transitions)
-    # at the right location in the redis-servor
     def append_actor_buffer(
         self, actor_buffer, actor_index_in_replay_memory, id_actor, priorities, T_actor
     ):
+        """
+        This function add the actor buffer (consisting of multiple consecutive transitions)
+        at the right location in the redis-servor
+        """
         # print("append some data to redis servor")
         indexes = (
             np.arange(
