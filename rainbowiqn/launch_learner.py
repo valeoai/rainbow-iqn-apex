@@ -63,6 +63,22 @@ def update_priorities_in_thread(mp_queue_update_priorities, mem_redis):
         mem_redis.update_priorities(idxs, priorities)  # Update priorities of sampled transitions
 
 
+def starting_actual_learning(mp_queue_sample, mem_learner, args, mp_queue_update_priorities):
+    print("Starting actual learning")
+    print("Starting the sample subprocess")
+    p = Process(
+        target=sample_in_thread,
+        args=(mp_queue_sample, mem_learner, args.batch_size, args.queue_size),
+    )
+    p.daemon = True
+    p.start()
+
+    print("Starting the update priorities subprocess")
+    p = Process(target=update_priorities_in_thread, args=(mp_queue_update_priorities, mem_learner))
+    p.daemon = True
+    p.start()
+
+
 def main():
 
     args = return_args()
@@ -142,37 +158,25 @@ def main():
             or mem_learner.transitions.get_current_capacity() >= capacity_before_learning
         ):
             if not memory_got_enough_experience:
-                print("Starting actual learning")
+                starting_actual_learning(
+                    mp_queue_sample, mem_learner, args, mp_queue_update_priorities
+                )
                 T = initial_T_learner
                 memory_got_enough_experience = True
-                print("Starting the sample subprocess")
-                p = Process(
-                    target=sample_in_thread,
-                    args=(mp_queue_sample, mem_learner, args.batch_size, args.queue_size),
-                )
-                p.daemon = True
-                p.start()
 
-                print("Starting the update priorities subprocess")
-                p = Process(
-                    target=update_priorities_in_thread,
-                    args=(mp_queue_update_priorities, mem_learner),
-                )
-                p.daemon = True
-                p.start()
-
-            # Just a small hack to set memory_full to True because now we sample in another Thread...
+            # Just a small hack to set memory_full to True
+            # because now we sample in another Thread...
             if T % cst.hack_set_full_capacity_to_true == 0:
                 mem_learner.transitions.get_current_capacity()
 
+            # Anneal importance sampling weight β to 1
             mem_learner.priority_weight = min(
                 mem_learner.priority_weight + priority_weight_increase, 1
-            )  # Anneal importance sampling weight β to 1
+            )
 
             if T % args.replay_frequency == 0:
-                idxs, loss = learner.learn(
-                    mem_learner, mp_queue_sample
-                )  # Train with n-step distributional double-Q learning
+                # Train with n-step distributional double-Q learning
+                idxs, loss = learner.learn(mem_learner, mp_queue_sample)
                 buffer_idxs.append(idxs)
                 buffer_loss.append(loss)
                 if len(buffer_loss) == args.queue_size:
