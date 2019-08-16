@@ -120,11 +120,10 @@ class Agent:
 
                 # Compute Tz (Bellman operator T applied to z)
 
+                # Tz = R^n + (γ^n)z (accounting for terminal states)
                 Tz = returns.unsqueeze(1) + nonterminals.unsqueeze(1) * (
                     self.discount ** self.n
-                ) * self.support.unsqueeze(
-                    0
-                )  # Tz = R^n + (γ^n)z (accounting for terminal states)
+                ) * self.support.unsqueeze(0)
                 Tz = Tz.clamp(min=self.Vmin, max=self.Vmax)  # Clamp between supported values
                 # Compute L2 projection of Tz onto fixed support z
                 b = (Tz - self.Vmin) / self.delta_z  # b = (Tz - Vmin) / Δz
@@ -151,9 +150,8 @@ class Agent:
                 # there in both case (actor or learner)          #
                 ##################################################
 
-            loss = -(
-                torch.sum(m * log_ps_a, 1)
-            )  # Cross-entropy loss (minimise DKL(m||p(s_t, a_t)))
+            # Cross-entropy loss (minimise DKL(m||p(s_t, a_t)))
+            loss = -(torch.sum(m * log_ps_a, 1))
 
         else:  # IQN loss
             loss = compute_loss_iqn.compute_loss_actor_or_learner_iqn(
