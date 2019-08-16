@@ -289,7 +289,7 @@ def return_args():
 
     print(" " * 26 + "Options")
     for k, v in vars(args).items():
-        print(" " * 26 + k + ": " + str(v))
+        print(" " * 26 + f"{k}: {v}")
 
     if args.path_to_results is None:
         args.path_to_results = os.path.join(
@@ -313,9 +313,8 @@ def return_args():
         )
 
         print(
-            "We found the filename " + last_model + " to restart, number of step actor already "
-            "done is ",
-            step_actors_already_done,
+            f"We found the filename {last_model} to restart, number of step actor already "
+            f"done is {step_actors_already_done}"
         )
         print(
             "We found the filename " + last_model + " to restart, number of step learner already"
@@ -344,10 +343,9 @@ def return_args():
         args.max_episode_length = 100 * 3600 * 60  # 100 hours (at 60 Hz)
         args.max_frame_stuck_SABER = 5 * 60 * 60  # 5 minutes (at 60 Hz)
     else:
-        print("THIS IS DECONSEILLED, let's set a max_episode_length of 30 minutes")
-        args.max_episode_length = (
-            30 * 60 * 60
-        )  # We use 30 minutes when no SABER mode (like Rainbow, DQN, IQN...).
+        print("THIS IS NOT ADVISED, let's set a max_episode_length of 30 minutes")
+        # We use 30 minutes when no SABER mode (like Rainbow, DQN, IQN...).
+        args.max_episode_length = 30 * 60 * 60
 
     random.seed(args.seed)
     torch.manual_seed(random.randint(1, 10000))

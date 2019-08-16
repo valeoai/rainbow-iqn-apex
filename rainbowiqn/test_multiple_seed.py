@@ -71,12 +71,8 @@ def test_multiple_seed(args, debug=False):
             if done:
                 if debug:
                     print(
-                        "Episode terminated after "
-                        + str(step)
-                        + " steps. Reward episode "
-                        + str(episode_number)
-                        + " = ",
-                        reward_sum,
+                        f"Episode terminated after {step} steps. Reward episode "
+                        f"{episode_number} = {reward_sum}"
                     )
                 T_rewards.append(reward_sum)
                 T_true_RL_reward.append(true_RL_reward_sum)

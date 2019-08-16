@@ -93,9 +93,7 @@ print("Starting training loop")
 # Training loop
 if args.continue_experiment:
     print(
-        "We are restarting a stopped experience with a model trained for "
-        + str(args.step_learner_already_done)
-        + "steps"
+        f"We are restarting a stopped experience with a model trained for {args.step_learner_already_done} steps"
     )
     initial_T_learner = args.step_learner_already_done
     print("initial T learner equal ", initial_T_learner)
@@ -129,7 +127,7 @@ buffer_loss = []
 while T < args.T_max:
 
     if T % args.log_interval == 0:
-        log("T = " + str(T) + " / " + str(args.T_max))
+        log(f"T = {T} / {args.T_max}")
         duration = time.time() - start_time
         print("Time between 2 log_interval for learner (%.3f sec)" % duration)
         start_time = time.time()
