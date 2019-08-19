@@ -229,7 +229,7 @@ def launch_actor(id_actor, args, redis_servor):
         T_actor += 1
 
 
-def dump(redis_servor, args, T_actor, reward_buffer, tab_rewards_plot, actor):
+def dump(redis_servor, args, T_actor, reward_buffer, actor):
     pipe = redis_servor.pipeline()
     pipe.get(cst.STEP_LEARNER_STR)
     for id_actor_loop in range(args.nb_actor):
@@ -268,7 +268,7 @@ def dump(redis_servor, args, T_actor, reward_buffer, tab_rewards_plot, actor):
 
     log(f"T = {T_total_actors} / {args.T_max} | Avg. reward: {current_avg_reward}")
 
-    tab_rewards_plot.append(list(reward_buffer.total_reward_buffer_SABER))
+    reward_buffer.tab_rewards_plot.append(list(reward_buffer.total_reward_buffer_SABER))
 
     # Plot
     _plot_line(
@@ -276,7 +276,7 @@ def dump(redis_servor, args, T_actor, reward_buffer, tab_rewards_plot, actor):
         reward_buffer.Tab_T_learner,
         reward_buffer.Tab_length_episode,
         reward_buffer.Tab_longest_episode,
-        tab_rewards_plot,
+        reward_buffer.tab_rewards_plot,
         "Reward_" + args.game,
         path=args.path_to_results,
     )
