@@ -23,7 +23,7 @@ def log(s):
 
 
 class RewardBuffer:
-    def __init__(self, evaluation_episodes):
+    def __init__(self, evaluation_episodes, action_repeat):
 
         # We initialize all buffer with 0 because sometimes there are not totally
         # filled for the first evaluation step and this leads to a bug in the plot...
@@ -47,17 +47,18 @@ class RewardBuffer:
         self.Tab_longest_episode = []
         self.tab_rewards_plot = []
         self.best_avg_reward = -1e10
+        self.action_repeat = action_repeat
 
-    def update(self, timestep, action_repeat):
+    def update(self, timestep):
         self.total_reward_buffer_SABER.append(self.current_total_reward_SABER)
 
         # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
-        if timestep < (5 * 60 * 60) / action_repeat:
+        if timestep < (5 * 60 * 60) / self.action_repeat:
             self.current_total_reward_5min = self.current_total_reward_SABER
         self.total_reward_buffer_5min.append(self.current_total_reward_5min)
 
         # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
-        if timestep < (30 * 60 * 60) / action_repeat:
+        if timestep < (30 * 60 * 60) / self.action_repeat:
             self.current_total_reward_30min = self.current_total_reward_SABER
         self.total_reward_buffer_30min.append(self.current_total_reward_30min)
 
@@ -66,14 +67,14 @@ class RewardBuffer:
         self.current_total_reward_30min = 0
         self.current_total_reward_5min = 0
 
-    def update2(self, timestep, action_repeat, reward):
+    def update2(self, timestep, reward):
         # THIS should be before clipping, we want to know the true score of the game there!
         self.current_total_reward_SABER += reward
         # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
-        if timestep == (5 * 60 * 60) / action_repeat:
+        if timestep == (5 * 60 * 60) / self.action_repeat:
             self.current_total_reward_5min = self.current_total_reward_SABER
         # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
-        if timestep == (30 * 60 * 60) / action_repeat:
+        if timestep == (30 * 60 * 60) / self.action_repeat:
             self.current_total_reward_30min = self.current_total_reward_SABER
 
     def update3(self, T_total_actors, T_learner):
@@ -135,12 +136,12 @@ def launch_actor(id_actor, args, redis_servor):
     tab_nonterminal = []
 
     if id_actor == 0:
-        reward_buffer = RewardBuffer(args.evaluation_episodes)
+        reward_buffer = RewardBuffer(args.evaluation_episodes, args.action_repeat)
 
     while T_actor < (args.T_max / args.nb_actor):
         if done_actor:
             if id_actor == 0 and T_actor > initial_T_actor:
-                reward_buffer.update(timestep, args.action_repeat)
+                reward_buffer.update(timestep)
             timestep = 0
             state_buffer_actor = env_actor.reset()
             done_actor = False
@@ -160,7 +161,7 @@ def launch_actor(id_actor, args, redis_servor):
             env_actor.render()
 
         if id_actor == 0:
-            reward_buffer.update2(timestep, args.action_repeat, reward)
+            reward_buffer.update2(timestep, reward)
 
         if args.reward_clip > 0:
             reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
