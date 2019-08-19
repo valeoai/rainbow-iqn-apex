@@ -76,6 +76,25 @@ class RewardBuffer:
         if timestep == (30 * 60 * 60) / action_repeat:
             self.current_total_reward_30min = self.current_total_reward_SABER
 
+    def update3(self, T_total_actors, T_learner):
+        self.Tab_T_actors.append(T_total_actors)
+        self.Tab_T_learner.append(T_learner)
+
+        current_avg_episode_length = sum(self.episode_length_buffer) / len(
+            self.episode_length_buffer
+        )
+        self.Tab_length_episode.append(current_avg_episode_length)
+
+        indice_longest_episode = np.argmax(self.episode_length_buffer)
+        self.Tab_longest_episode.append(
+            (
+                self.episode_length_buffer[indice_longest_episode],
+                self.total_reward_buffer_SABER[indice_longest_episode],
+            )
+        )
+
+        return sum(self.total_reward_buffer_SABER) / len(self.total_reward_buffer_SABER)
+
 
 # Create an actor instance
 def launch_actor(id_actor, args, redis_servor):
@@ -246,25 +265,7 @@ def dump(redis_servor, args, T_actor, reward_buffer, actor):
         for nb_step_actor in step_all_agent:
             T_total_actors += int(nb_step_actor)
 
-    reward_buffer.Tab_T_actors.append(T_total_actors)
-    reward_buffer.Tab_T_learner.append(T_learner)
-
-    current_avg_episode_length = sum(reward_buffer.episode_length_buffer) / len(
-        reward_buffer.episode_length_buffer
-    )
-    reward_buffer.Tab_length_episode.append(current_avg_episode_length)
-
-    indice_longest_episode = np.argmax(reward_buffer.episode_length_buffer)
-    reward_buffer.Tab_longest_episode.append(
-        (
-            reward_buffer.episode_length_buffer[indice_longest_episode],
-            reward_buffer.total_reward_buffer_SABER[indice_longest_episode],
-        )
-    )
-
-    current_avg_reward = sum(reward_buffer.total_reward_buffer_SABER) / len(
-        reward_buffer.total_reward_buffer_SABER
-    )
+    current_avg_reward = reward_buffer.update3()
 
     log(f"T = {T_total_actors} / {args.T_max} | Avg. reward: {current_avg_reward}")
 
