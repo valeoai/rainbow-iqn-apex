@@ -34,6 +34,9 @@ class RewardBuffer:
             [0] * evaluation_episodes, maxlen=evaluation_episodes
         )
         self.episode_length_buffer = deque([0] * evaluation_episodes, maxlen=evaluation_episodes)
+        self.current_total_reward_SABER = 0
+        self.current_total_reward_30min = 0
+        self.current_total_reward_5min = 0
 
 
 # Create an actor instance
@@ -82,29 +85,36 @@ def launch_actor(id_actor, args, redis_servor):
         # We initialize all buffer with 0 because sometimes there are not totally
         # filled for the first evaluation step and this leads to a bug in the plot...
         reward_buffer = RewardBuffer(args.evaluation_episodes)
-        current_total_reward_SABER = 0
-        current_total_reward_30min = 0
-        current_total_reward_5min = 0
 
     while T_actor < (args.T_max / args.nb_actor):
         if done_actor:
             if id_actor == 0 and T_actor > initial_T_actor:
-                reward_buffer.total_reward_buffer_SABER.append(current_total_reward_SABER)
+                reward_buffer.total_reward_buffer_SABER.append(
+                    reward_buffer.current_total_reward_SABER
+                )
 
                 # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
                 if timestep < (5 * 60 * 60) / args.action_repeat:
-                    current_total_reward_5min = current_total_reward_SABER
-                reward_buffer.total_reward_buffer_5min.append(current_total_reward_5min)
+                    reward_buffer.current_total_reward_5min = (
+                        reward_buffer.current_total_reward_SABER
+                    )
+                reward_buffer.total_reward_buffer_5min.append(
+                    reward_buffer.current_total_reward_5min
+                )
 
                 # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
                 if timestep < (30 * 60 * 60) / args.action_repeat:
-                    current_total_reward_30min = current_total_reward_SABER
-                reward_buffer.total_reward_buffer_30min.append(current_total_reward_30min)
+                    reward_buffer.current_total_reward_30min = (
+                        reward_buffer.current_total_reward_SABER
+                    )
+                reward_buffer.total_reward_buffer_30min.append(
+                    reward_buffer.current_total_reward_30min
+                )
 
                 reward_buffer.episode_length_buffer.append(timestep)
-                current_total_reward_SABER = 0
-                current_total_reward_30min = 0
-                current_total_reward_5min = 0
+                reward_buffer.current_total_reward_SABER = 0
+                reward_buffer.current_total_reward_30min = 0
+                reward_buffer.current_total_reward_5min = 0
             timestep = 0
             state_buffer_actor = env_actor.reset()
             done_actor = False
@@ -125,13 +135,13 @@ def launch_actor(id_actor, args, redis_servor):
 
         if id_actor == 0:
             # THIS should be before clipping, we want to know the true score of the game there!
-            current_total_reward_SABER += reward
+            reward_buffer.current_total_reward_SABER += reward
             # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
             if timestep == (5 * 60 * 60) / args.action_repeat:
-                current_total_reward_5min = current_total_reward_SABER
+                reward_buffer.current_total_reward_5min = reward_buffer.current_total_reward_SABER
             # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
             if timestep == (30 * 60 * 60) / args.action_repeat:
-                current_total_reward_30min = current_total_reward_SABER
+                reward_buffer.current_total_reward_30min = reward_buffer.current_total_reward_SABER
 
         if args.reward_clip > 0:
             reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
