@@ -24,6 +24,9 @@ def log(s):
 
 class RewardBuffer:
     def __init__(self, evaluation_episodes):
+
+        # We initialize all buffer with 0 because sometimes there are not totally
+        # filled for the first evaluation step and this leads to a bug in the plot...
         self.total_reward_buffer_SABER = deque(
             [0] * evaluation_episodes, maxlen=evaluation_episodes
         )
@@ -42,6 +45,8 @@ class RewardBuffer:
         self.Tab_T_learner = []
         self.Tab_length_episode = []
         self.Tab_longest_episode = []
+        self.tab_rewards_plot = []
+        self.best_avg_reward = -1e10
 
     def update(self, timestep, action_repeat):
         self.total_reward_buffer_SABER.append(self.current_total_reward_SABER)
@@ -111,11 +116,6 @@ def launch_actor(id_actor, args, redis_servor):
     tab_nonterminal = []
 
     if id_actor == 0:
-        # Variables for plot and dump in csv only
-        tab_rewards_plot, best_avg_reward = [], -1e10
-
-        # We initialize all buffer with 0 because sometimes there are not totally
-        # filled for the first evaluation step and this leads to a bug in the plot...
         reward_buffer = RewardBuffer(args.evaluation_episodes)
 
     while T_actor < (args.T_max / args.nb_actor):
@@ -222,23 +222,14 @@ def launch_actor(id_actor, args, redis_servor):
             and id_actor == 0
             and T_actor >= (initial_T_actor + args.evaluation_interval / 2)
         ):
-            current_avg_reward = dump(
-                redis_servor,
-                args,
-                T_actor,
-                reward_buffer,
-                tab_rewards_plot,
-                actor,
-                best_avg_reward,
-            )
-            best_avg_reward = max(current_avg_reward, best_avg_reward)
+            dump(redis_servor, args, T_actor, reward_buffer, actor)
 
         state_buffer_actor = next_state_buffer_actor
         timestep += 1
         T_actor += 1
 
 
-def dump(redis_servor, args, T_actor, reward_buffer, tab_rewards_plot, actor, best_avg_reward):
+def dump(redis_servor, args, T_actor, reward_buffer, tab_rewards_plot, actor):
     pipe = redis_servor.pipeline()
     pipe.get(cst.STEP_LEARNER_STR)
     for id_actor_loop in range(args.nb_actor):
@@ -317,9 +308,9 @@ def dump(redis_servor, args, T_actor, reward_buffer, tab_rewards_plot, actor, be
         f"last_model_{args.game}_{T_total_actors}.pth",
     )
 
-    if current_avg_reward > best_avg_reward:
+    if current_avg_reward > reward_buffer.best_avg_reward:
+        reward_buffer.best_avg_reward = current_avg_reward
         actor.save(args.path_to_results, T_total_actors, T_learner, f"best_model_{args.game}.pth")
-    return current_avg_reward
 
 
 def main():
