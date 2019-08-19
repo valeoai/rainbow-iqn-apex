@@ -22,6 +22,20 @@ def log(s):
     print("[" + str(datetime.now().strftime("%Y-%m-%dT%H:%M:%S")) + "] " + s)
 
 
+class RewardBuffer:
+    def __init__(self, evaluation_episodes):
+        self.total_reward_buffer_SABER = deque(
+            [0] * evaluation_episodes, maxlen=evaluation_episodes
+        )
+        self.total_reward_buffer_30min = deque(
+            [0] * evaluation_episodes, maxlen=evaluation_episodes
+        )
+        self.total_reward_buffer_5min = deque(
+            [0] * evaluation_episodes, maxlen=evaluation_episodes
+        )
+        self.episode_length_buffer = deque([0] * evaluation_episodes, maxlen=evaluation_episodes)
+
+
 # Create an actor instance
 def launch_actor(id_actor, args, redis_servor):
 
@@ -67,18 +81,7 @@ def launch_actor(id_actor, args, redis_servor):
 
         # We initialize all buffer with 0 because sometimes there are not totally
         # filled for the first evaluation step and this leads to a bug in the plot...
-        total_reward_buffer_SABER = deque(
-            [0] * args.evaluation_episodes, maxlen=args.evaluation_episodes
-        )
-        total_reward_buffer_30min = deque(
-            [0] * args.evaluation_episodes, maxlen=args.evaluation_episodes
-        )
-        total_reward_buffer_5min = deque(
-            [0] * args.evaluation_episodes, maxlen=args.evaluation_episodes
-        )
-        episode_length_buffer = deque(
-            [0] * args.evaluation_episodes, maxlen=args.evaluation_episodes
-        )
+        reward_buffer = RewardBuffer(args.evaluation_episodes)
         current_total_reward_SABER = 0
         current_total_reward_30min = 0
         current_total_reward_5min = 0
@@ -86,19 +89,19 @@ def launch_actor(id_actor, args, redis_servor):
     while T_actor < (args.T_max / args.nb_actor):
         if done_actor:
             if id_actor == 0 and T_actor > initial_T_actor:
-                total_reward_buffer_SABER.append(current_total_reward_SABER)
+                reward_buffer.total_reward_buffer_SABER.append(current_total_reward_SABER)
 
                 # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
                 if timestep < (5 * 60 * 60) / args.action_repeat:
                     current_total_reward_5min = current_total_reward_SABER
-                total_reward_buffer_5min.append(current_total_reward_5min)
+                reward_buffer.total_reward_buffer_5min.append(current_total_reward_5min)
 
                 # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
                 if timestep < (30 * 60 * 60) / args.action_repeat:
                     current_total_reward_30min = current_total_reward_SABER
-                total_reward_buffer_30min.append(current_total_reward_30min)
+                reward_buffer.total_reward_buffer_30min.append(current_total_reward_30min)
 
-                episode_length_buffer.append(timestep)
+                reward_buffer.episode_length_buffer.append(timestep)
                 current_total_reward_SABER = 0
                 current_total_reward_30min = 0
                 current_total_reward_5min = 0
@@ -215,13 +218,10 @@ def launch_actor(id_actor, args, redis_servor):
                 T_actor,
                 Tab_T_actors,
                 Tab_T_learner,
-                episode_length_buffer,
+                reward_buffer,
                 Tab_length_episode,
                 Tab_longest_episode,
-                total_reward_buffer_SABER,
                 tab_rewards_plot,
-                total_reward_buffer_5min,
-                total_reward_buffer_30min,
                 actor,
                 best_avg_reward,
             )
@@ -238,13 +238,10 @@ def dump(
     T_actor,
     Tab_T_actors,
     Tab_T_learner,
-    episode_length_buffer,
+    reward_buffer,
     Tab_length_episode,
     Tab_longest_episode,
-    total_reward_buffer_SABER,
     tab_rewards_plot,
-    total_reward_buffer_5min,
-    total_reward_buffer_30min,
     actor,
     best_avg_reward,
 ):
@@ -267,22 +264,26 @@ def dump(
     Tab_T_actors.append(T_total_actors)
     Tab_T_learner.append(T_learner)
 
-    current_avg_episode_length = sum(episode_length_buffer) / len(episode_length_buffer)
+    current_avg_episode_length = sum(reward_buffer.episode_length_buffer) / len(
+        reward_buffer.episode_length_buffer
+    )
     Tab_length_episode.append(current_avg_episode_length)
 
-    indice_longest_episode = np.argmax(episode_length_buffer)
+    indice_longest_episode = np.argmax(reward_buffer.episode_length_buffer)
     Tab_longest_episode.append(
         (
-            episode_length_buffer[indice_longest_episode],
-            total_reward_buffer_SABER[indice_longest_episode],
+            reward_buffer.episode_length_buffer[indice_longest_episode],
+            reward_buffer.total_reward_buffer_SABER[indice_longest_episode],
         )
     )
 
-    current_avg_reward = sum(total_reward_buffer_SABER) / len(total_reward_buffer_SABER)
+    current_avg_reward = sum(reward_buffer.total_reward_buffer_SABER) / len(
+        reward_buffer.total_reward_buffer_SABER
+    )
 
     log(f"T = {T_total_actors} / {args.T_max} | Avg. reward: {current_avg_reward}")
 
-    tab_rewards_plot.append(list(total_reward_buffer_SABER))
+    tab_rewards_plot.append(list(reward_buffer.total_reward_buffer_SABER))
 
     # Plot
     _plot_line(
@@ -300,10 +301,10 @@ def dump(
         args.game,
         T_total_actors,
         T_learner,
-        total_reward_buffer_5min,
-        total_reward_buffer_30min,
-        total_reward_buffer_SABER,
-        episode_length_buffer,
+        reward_buffer.total_reward_buffer_5min,
+        reward_buffer.total_reward_buffer_30min,
+        reward_buffer.total_reward_buffer_SABER,
+        reward_buffer.episode_length_buffer,
     )
 
     for filename in os.listdir(args.path_to_results):
