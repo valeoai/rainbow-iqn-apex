@@ -38,6 +38,11 @@ class RewardBuffer:
         self.current_total_reward_30min = 0
         self.current_total_reward_5min = 0
 
+        self.Tab_T_actors = []
+        self.Tab_T_learner = []
+        self.Tab_length_episode = []
+        self.Tab_longest_episode = []
+
     def update(self, timestep, action_repeat):
         self.total_reward_buffer_SABER.append(self.current_total_reward_SABER)
 
@@ -107,7 +112,6 @@ def launch_actor(id_actor, args, redis_servor):
 
     if id_actor == 0:
         # Variables for plot and dump in csv only
-        Tab_T_actors, Tab_T_learner, Tab_length_episode, Tab_longest_episode = ([], [], [], [])
         tab_rewards_plot, best_avg_reward = [], -1e10
 
         # We initialize all buffer with 0 because sometimes there are not totally
@@ -222,11 +226,7 @@ def launch_actor(id_actor, args, redis_servor):
                 redis_servor,
                 args,
                 T_actor,
-                Tab_T_actors,
-                Tab_T_learner,
                 reward_buffer,
-                Tab_length_episode,
-                Tab_longest_episode,
                 tab_rewards_plot,
                 actor,
                 best_avg_reward,
@@ -238,19 +238,7 @@ def launch_actor(id_actor, args, redis_servor):
         T_actor += 1
 
 
-def dump(
-    redis_servor,
-    args,
-    T_actor,
-    Tab_T_actors,
-    Tab_T_learner,
-    reward_buffer,
-    Tab_length_episode,
-    Tab_longest_episode,
-    tab_rewards_plot,
-    actor,
-    best_avg_reward,
-):
+def dump(redis_servor, args, T_actor, reward_buffer, tab_rewards_plot, actor, best_avg_reward):
     pipe = redis_servor.pipeline()
     pipe.get(cst.STEP_LEARNER_STR)
     for id_actor_loop in range(args.nb_actor):
@@ -267,16 +255,16 @@ def dump(
         for nb_step_actor in step_all_agent:
             T_total_actors += int(nb_step_actor)
 
-    Tab_T_actors.append(T_total_actors)
-    Tab_T_learner.append(T_learner)
+    reward_buffer.Tab_T_actors.append(T_total_actors)
+    reward_buffer.Tab_T_learner.append(T_learner)
 
     current_avg_episode_length = sum(reward_buffer.episode_length_buffer) / len(
         reward_buffer.episode_length_buffer
     )
-    Tab_length_episode.append(current_avg_episode_length)
+    reward_buffer.Tab_length_episode.append(current_avg_episode_length)
 
     indice_longest_episode = np.argmax(reward_buffer.episode_length_buffer)
-    Tab_longest_episode.append(
+    reward_buffer.Tab_longest_episode.append(
         (
             reward_buffer.episode_length_buffer[indice_longest_episode],
             reward_buffer.total_reward_buffer_SABER[indice_longest_episode],
@@ -293,10 +281,10 @@ def dump(
 
     # Plot
     _plot_line(
-        Tab_T_actors,
-        Tab_T_learner,
-        Tab_length_episode,
-        Tab_longest_episode,
+        reward_buffer.Tab_T_actors,
+        reward_buffer.Tab_T_learner,
+        reward_buffer.Tab_length_episode,
+        reward_buffer.Tab_longest_episode,
         tab_rewards_plot,
         "Reward_" + args.game,
         path=args.path_to_results,
