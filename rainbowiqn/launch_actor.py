@@ -1,9 +1,6 @@
 import logging
-import os
 import random
 import time
-from collections import deque
-from datetime import datetime
 
 import numpy as np
 import redis
@@ -14,87 +11,8 @@ from rainbowiqn.actor import Actor
 from rainbowiqn.args import return_args
 from rainbowiqn.env import Env
 from rainbowiqn.redis_memory import ReplayRedisMemory
-from rainbowiqn.utils import _plot_line, dump_in_csv
-
-
-# Simple ISO 8601 timestamped logger
-def log(s):
-    print("[" + str(datetime.now().strftime("%Y-%m-%dT%H:%M:%S")) + "] " + s)
-
-
-class RewardBuffer:
-    def __init__(self, evaluation_episodes, action_repeat):
-
-        # We initialize all buffer with 0 because sometimes there are not totally
-        # filled for the first evaluation step and this leads to a bug in the plot...
-        self.total_reward_buffer_SABER = deque(
-            [0] * evaluation_episodes, maxlen=evaluation_episodes
-        )
-        self.total_reward_buffer_30min = deque(
-            [0] * evaluation_episodes, maxlen=evaluation_episodes
-        )
-        self.total_reward_buffer_5min = deque(
-            [0] * evaluation_episodes, maxlen=evaluation_episodes
-        )
-        self.episode_length_buffer = deque([0] * evaluation_episodes, maxlen=evaluation_episodes)
-        self.current_total_reward_SABER = 0
-        self.current_total_reward_30min = 0
-        self.current_total_reward_5min = 0
-
-        self.Tab_T_actors = []
-        self.Tab_T_learner = []
-        self.Tab_length_episode = []
-        self.Tab_longest_episode = []
-        self.tab_rewards_plot = []
-        self.best_avg_reward = -1e10
-        self.action_repeat = action_repeat
-
-    def update(self, timestep):
-        self.total_reward_buffer_SABER.append(self.current_total_reward_SABER)
-
-        # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
-        if timestep < (5 * 60 * 60) / self.action_repeat:
-            self.current_total_reward_5min = self.current_total_reward_SABER
-        self.total_reward_buffer_5min.append(self.current_total_reward_5min)
-
-        # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
-        if timestep < (30 * 60 * 60) / self.action_repeat:
-            self.current_total_reward_30min = self.current_total_reward_SABER
-        self.total_reward_buffer_30min.append(self.current_total_reward_30min)
-
-        self.episode_length_buffer.append(timestep)
-        self.current_total_reward_SABER = 0
-        self.current_total_reward_30min = 0
-        self.current_total_reward_5min = 0
-
-    def update2(self, timestep, reward):
-        # THIS should be before clipping, we want to know the true score of the game there!
-        self.current_total_reward_SABER += reward
-        # 5 minutes * 60 secondes * 60 HZ Atari game / action repeat
-        if timestep == (5 * 60 * 60) / self.action_repeat:
-            self.current_total_reward_5min = self.current_total_reward_SABER
-        # 30 minutes * 60 secondes * 60 HZ Atari game / action repeat
-        if timestep == (30 * 60 * 60) / self.action_repeat:
-            self.current_total_reward_30min = self.current_total_reward_SABER
-
-    def update3(self, T_total_actors, T_learner):
-        self.Tab_T_actors.append(T_total_actors)
-        self.Tab_T_learner.append(T_learner)
-
-        current_avg_episode_length = sum(self.episode_length_buffer) / len(
-            self.episode_length_buffer
-        )
-        self.Tab_length_episode.append(current_avg_episode_length)
-
-        indice_longest_episode = np.argmax(self.episode_length_buffer)
-        self.Tab_longest_episode.append(
-            (
-                self.episode_length_buffer[indice_longest_episode],
-                self.total_reward_buffer_SABER[indice_longest_episode],
-            )
-        )
-
-        return sum(self.total_reward_buffer_SABER) / len(self.total_reward_buffer_SABER)
+from rainbowiqn.utils import dump_in_csv_and_plot_reward, log
+from rainbowiqn.reward_buffer import RewardBuffer
 
 
 # Create an actor instance
@@ -141,7 +59,7 @@ def launch_actor(id_actor, args, redis_servor):
     while T_actor < (args.T_max / args.nb_actor):
         if done_actor:
             if id_actor == 0 and T_actor > initial_T_actor:
-                reward_buffer.update(timestep)
+                reward_buffer.update_score_episode_buffer(timestep)
             timestep = 0
             state_buffer_actor = env_actor.reset()
             done_actor = False
@@ -161,7 +79,7 @@ def launch_actor(id_actor, args, redis_servor):
             env_actor.render()
 
         if id_actor == 0:
-            reward_buffer.update2(timestep, reward)
+            reward_buffer.update_current_reward_buffer(timestep, reward)
 
         if args.reward_clip > 0:
             reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
@@ -242,77 +160,11 @@ def launch_actor(id_actor, args, redis_servor):
             and id_actor == 0
             and T_actor >= (initial_T_actor + args.evaluation_interval / 2)
         ):
-            dump(redis_servor, args, T_actor, reward_buffer, actor)
+            dump_in_csv_and_plot_reward(redis_servor, args, T_actor, reward_buffer, actor)
 
         state_buffer_actor = next_state_buffer_actor
         timestep += 1
         T_actor += 1
-
-
-def dump(redis_servor, args, T_actor, reward_buffer, actor):
-    pipe = redis_servor.pipeline()
-    pipe.get(cst.STEP_LEARNER_STR)
-    for id_actor_loop in range(args.nb_actor):
-        pipe.get(cst.STEP_ACTOR_STR + str(id_actor_loop))
-    step_all_agent = pipe.execute()
-
-    T_learner = int(
-        step_all_agent.pop(0)
-    )  # We remove first element of the list because it's the number of learner step
-    T_total_actors = 0
-    if args.nb_actor == 1:  # If only one actor, we can just get this value locally
-        T_total_actors = T_actor
-    else:
-        for nb_step_actor in step_all_agent:
-            T_total_actors += int(nb_step_actor)
-
-    current_avg_reward = reward_buffer.update3()
-
-    log(f"T = {T_total_actors} / {args.T_max} | Avg. reward: {current_avg_reward}")
-
-    reward_buffer.tab_rewards_plot.append(list(reward_buffer.total_reward_buffer_SABER))
-
-    # Plot
-    _plot_line(
-        reward_buffer.Tab_T_actors,
-        reward_buffer.Tab_T_learner,
-        reward_buffer.Tab_length_episode,
-        reward_buffer.Tab_longest_episode,
-        reward_buffer.tab_rewards_plot,
-        "Reward_" + args.game,
-        path=args.path_to_results,
-    )
-
-    dump_in_csv(
-        args.path_to_results,
-        args.game,
-        T_total_actors,
-        T_learner,
-        reward_buffer.total_reward_buffer_5min,
-        reward_buffer.total_reward_buffer_30min,
-        reward_buffer.total_reward_buffer_SABER,
-        reward_buffer.episode_length_buffer,
-    )
-
-    for filename in os.listdir(args.path_to_results):
-        if "last_model_" + args.game in filename:
-            try:
-                os.remove(os.path.join(args.path_to_results, filename))
-            except OSError:
-                print(
-                    f"last_model_{args.game} were not found, " f"that's not suppose to happen..."
-                )
-                pass
-    actor.save(
-        args.path_to_results,
-        T_total_actors,
-        T_learner,
-        f"last_model_{args.game}_{T_total_actors}.pth",
-    )
-
-    if current_avg_reward > reward_buffer.best_avg_reward:
-        reward_buffer.best_avg_reward = current_avg_reward
-        actor.save(args.path_to_results, T_total_actors, T_learner, f"best_model_{args.game}.pth")
 
 
 def main():
