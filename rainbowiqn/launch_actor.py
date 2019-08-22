@@ -53,11 +53,20 @@ def launch_actor(id_actor, args, redis_servor):
     tab_reward = []
     tab_nonterminal = []
 
+    # We want to warn the user when the agent reachs 100 hours of gameplay continuously improving
+    # score. On thoses game the agent is superhuman (and learning should be stop maybe?)
+    if not args.disable_SABER_mode:  # SABER mode: length episode can be infinite (100 hours)
+        step_100_hours = int(args.max_episode_length / args.action_repeat) - 1
+
     if id_actor == 0:
         reward_buffer = RewardBuffer(args.evaluation_episodes, args.action_repeat)
 
     while T_actor < (args.T_max / args.nb_actor):
         if done_actor:
+            if not args.disable_SABER_mode and timestep >= step_100_hours:
+                print("Agent reachs 100 hours of gameplay while continuously improving score!"
+                      "Agent is superhuman (happened only on Atlantis, Defender and Asteroids)."
+                      "Learning could be stopped now...")
             if id_actor == 0 and T_actor > initial_T_actor:
                 reward_buffer.update_score_episode_buffer(timestep)
             timestep = 0

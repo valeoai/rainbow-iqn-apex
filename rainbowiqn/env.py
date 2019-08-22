@@ -90,23 +90,24 @@ class Env:
                 # Let's end this episode
                 done = True
 
-        # HANDLING BUG ON REWARD, particularly on defender!
+        # HANDLING buffer rollover (happened on Atlantis, VideoPinball, Defender and Asterix)
+        if reward < -900000:
+            print(
+                f"We got a reward of {reward} this is almost certainly a buffer rollover, "
+                "this bug was spotten only on Atlantis, VideoPinball, Defender and Asterix "
+                "for the moment"
+            )
+            reward = 1000000 + reward
+            print(f"we replaced this reward with a new one to keep track of actual score,"
+                  f"new reward = {reward}")
+
+        # HANDLING BUG ON REWARD on defender!
         # This is specific to defender
         if self.handle_bug_in_defender:
-            if reward < -1:
-                reward = 1000000 + reward  # Buffer rollover
             if reward < 100:
                 reward = 0  # We always got a initial reward of 10 for no reason, let's set it to 0
             else:
-                reward = math.ceil(reward / 100)
-
-        # HANDLING buffer rollover (happen at least on VideoPinball, Defender and Asterix)
-        if reward < -900000:
-            print(
-                "We got a reward inferior to -900000 this is almost certainly a buffer rollover, "
-                "this bug was spotten only on VideoPinball, Defender and Asterix for the moment"
-            )
-            reward = 1000000 + reward
+                reward = math.ceil(reward / 100)  # All reward are multiplied by 100 for no reason
 
         # Return state, reward, done
         return list(self.state_buffer), reward, done
