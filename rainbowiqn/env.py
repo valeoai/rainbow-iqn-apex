@@ -97,7 +97,9 @@ class Env:
                 "this bug was spotten only on Atlantis, VideoPinball, Defender and Asterix "
                 "for the moment"
             )
-            reward = 1000000 + reward
+            # Some example of Buffer rollover gives reward of -999800 or -99995000 when the true
+            # reward was respectively 200 or 5000, so let's just replace this bug by the true one
+            reward = 10 ** math.ceil(math.log10(abs(reward))) + reward
             print(f"we replaced this reward with a new one to keep track of actual score,"
                   f"new reward = {reward}")
 
