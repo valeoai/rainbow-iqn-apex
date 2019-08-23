@@ -69,14 +69,6 @@ def return_args():
         help="Frequency of sampling from memory",
     )
     parser.add_argument(
-        "--priority-exponent",
-        type=float,
-        default=0.2,
-        metavar="ω",
-        help="Prioritised experience replay exponent (originally denoted α), its 0.5 for original"
-        " Rainbow but R-IQN need a lower value",
-    )
-    parser.add_argument(
         "--priority-weight",
         type=float,
         default=0.4,
@@ -106,20 +98,6 @@ def return_args():
         default=1,
         metavar="VALUE",
         help="Reward clipping (0 to disable)",
-    )
-    parser.add_argument(
-        "--lr",
-        type=float,
-        default=0.00005,
-        metavar="η",
-        help="Learning rate from IQN paper (different than Rainbow)",
-    )
-    parser.add_argument(
-        "--adam-eps",
-        type=float,
-        default=0.0003125,
-        metavar="ε",
-        help="Adam epsilon from IQN paper (different than Rainbow)",
     )
     parser.add_argument("--batch-size", type=int, default=32, metavar="SIZE", help="Batch size")
     parser.add_argument(
@@ -217,6 +195,28 @@ def return_args():
     parser.add_argument(
         "--quantile-embedding-dim", default=64, type=int, help="n in equation 4 in IQN paper"
     )
+    parser.add_argument(
+        "--priority-exponent-IQN",
+        type=float,
+        default=0.2,
+        metavar="ω",
+        help="Prioritised experience replay exponent (originally denoted α), its 0.5 for original"
+        " Rainbow but R-IQN need a lower value of 0.2",
+    )
+    parser.add_argument(
+        "--lr-IQN",
+        type=float,
+        default=0.00005,
+        metavar="η",
+        help="Learning rate from IQN paper (different than Rainbow)",
+    )
+    parser.add_argument(
+        "--adam-eps-IQN",
+        type=float,
+        default=0.0003125,
+        metavar="ε",
+        help="Adam epsilon from IQN paper (different than Rainbow)",
+    )
     # IQN parameters
 
     # Rainbow only parameters(no IQN and C51 instead)
@@ -242,6 +242,28 @@ def return_args():
         default=10,
         metavar="V",
         help="Maximum of value distribution support",
+    )
+    parser.add_argument(
+        "--priority-exponent-Rainbow",
+        type=float,
+        default=0.5,
+        metavar="ω",
+        help="Prioritised experience replay exponent (originally denoted α), its 0.5 for original"
+        " Rainbow but R-IQN need a lower value of 0.2",
+    )
+    parser.add_argument(
+        "--lr-Rainbow",
+        type=float,
+        default=0.0000625,
+        metavar="η",
+        help="Learning rate from Rainbow paper (different than IQN)",
+    )
+    parser.add_argument(
+        "--adam-eps-Rainbow",
+        type=float,
+        default=1.5e-4,
+        metavar="ε",
+        help="Adam epsilon from Rainbow paper (different than IQN)",
     )
     # Rainbow only parameters(no IQN and C51 instead)
 
@@ -368,10 +390,16 @@ def return_args():
 
     if args.rainbow_only:
         print("Launching an experiment with Rainbow only (i.e. C51 instead of IQN)")
+        args.priority_exponent = args.priority_exponent_Rainbow
+        args.lr = args.lr_Rainbow
+        args.adam_eps = args.adam_eps_Rainbow
     else:
         print(
             "Launching an experiment with Rainbow IQN (you can disable"
             " IQN by using --rainbow-only True)"
         )
+        args.priority_exponent = args.priority_exponent_IQN
+        args.lr = args.lr_IQN
+        args.adam_eps = args.adam_eps_IQN
 
     return args
