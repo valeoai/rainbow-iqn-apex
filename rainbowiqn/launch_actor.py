@@ -61,7 +61,7 @@ def launch_actor(id_actor, args, redis_servor):
     if id_actor == 0:
         reward_buffer = RewardBuffer(args.evaluation_episodes, args.action_repeat)
 
-    while T_actor < (args.T_max / args.nb_actor):
+    while T_actor <= (args.T_max / args.nb_actor):
         if done_actor:
             if not args.disable_SABER_mode and timestep >= step_100_hours:
                 print("Agent reachs 100 hours of gameplay while continuously improving score!"

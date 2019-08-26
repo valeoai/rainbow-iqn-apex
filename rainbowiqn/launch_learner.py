@@ -138,7 +138,7 @@ def main():
     buffer_idxs = []
     buffer_loss = []
 
-    while T < args.T_max:
+    while T <= args.T_max:
 
         if T % args.log_interval == 0:
             log(f"T = {T} / {args.T_max}")
