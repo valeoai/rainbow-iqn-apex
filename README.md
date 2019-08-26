@@ -128,5 +128,5 @@ for Dopamine license)
 [1] [Rainbow: Combining Improvements in Deep Reinforcement Learning](https://arxiv.org/abs/1710.02298)<br/>
 [2] [Implicit Quantile Networks (IQN) for Distributional Reinforcement Learning](https://arxiv.org/abs/1806.06923)<br/>
 [3] [Distributed Prioritized Experience Replay](https://arxiv.org/abs/1803.00933)<br/>
-[4] [Is Deep Reinforcement Learning really superhuman on Atari?](https://arxiv.org/abs/1908.04683v1)<br/>
+[4] [Is Deep Reinforcement Learning really superhuman on Atari?](https://arxiv.org/abs/1908.04683)<br/>
 [5] [Revisiting the Arcade Learning Environment: Evaluation Protocols and Open Problems for General Agents](https://arxiv.org/abs/1709.06009)
