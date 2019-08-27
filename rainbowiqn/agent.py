@@ -77,7 +77,8 @@ class Agent:
         if self.rainbow_only:  # Rainbow only loss (C51 in stead of IQN)
             batch_size = len(states)
 
-            # Calculate current state probabilities (online network noise already sampled)
+            # Calculate current state probabilities
+            self.online_net.reset_noise()
             log_ps = self.online_net(states, log=True)  # Log probabilities log p(s_t, ·; θonline)
             log_ps_a = log_ps[range(batch_size), actions]  # log p(s_t, a_t; θonline)
 
@@ -89,6 +90,9 @@ class Agent:
                 ##################################################
 
                 # Calculate nth next state probabilities
+                # We sample a new noise for the action selection as mentioned
+                # in Noisy Network article when using dueling network
+                self.online_net.reset_noise()
                 # Probabilities p(s_t+n, ·; θonline)
                 pns = self.online_net(next_states)
                 # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
