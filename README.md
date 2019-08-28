@@ -27,7 +27,7 @@ strength of Rainbow-IQN Ape-X as a general algorithm.
 Requirements/Installation
 ------------
 
-- Python 3.5+
+- Python 3.6+
 - Pytorch >= 0.4.1
 - CUDA 9.0 or higher
 - [redis (link to install for Ubuntu 16)](https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-redis-on-ubuntu-16-04)
