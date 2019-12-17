@@ -89,7 +89,7 @@ Time between 2 log_interval for actor 0 (13.249 sec)  # (for the actor)
 Kill all 3 terminals after and see the [wiki](https://github.com/valeoai/rainbow-iqn-apex/wiki) to know how to launch experiments for real!
 
 To test a pretrained snapshot, you must download trained weight from 
-the [release](https://github.com/valeoai/rainbow-iqn-apex/releases/tag/v1.0) and then prompt the following command:
+the [release](https://github.com/valeoai/rainbow-iqn-apex/releases) and then prompt the following command:
 ```bash
 # Remove rendering for faster evaluation
 $ python rainbowiqn/test_multiple_seed.py --model with_weight/Rainbow_IQN/space_invaders/last_model_space_invaders_50000000.pth \

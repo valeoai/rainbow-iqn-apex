@@ -427,14 +427,33 @@ class ReplayRedisMemory:
             self.history, self.n, batch_size
         )  # Retrieve sample from tree with un-normalised probability
 
-        while np.min(tab_probs) <= 0:
-            print(
-                "This is a weird bug happening sometimes that I can't succeed "
-                "to understand... Let's just find_multiple_values again..."
-            )
-            tab_probs, data_indexes, tree_indexes, p_total = self.transitions.find_multiple_values(
-                self.history, self.n, batch_size
-            )
+        # This is a weird bug I didn't succeed to find, probably error from float32 precision.
+        # Lets just try to find again to obtain proba > 0
+        if np.min(tab_probs) <= 0:
+            for retry_find in range(10):
+                tab_probs, data_indexes, tree_indexes, p_total = self.transitions.find_multiple_values(
+                    self.history, self.n, batch_size
+                )
+                if np.min(tab_probs) > 0:
+                    break
+
+        # If still not find then set all prob <= 0 to 1/memory_capacity as it was
+        # uniform distribution for those transitions
+        # (this never happened in my experiments)
+        if np.min(tab_probs) <= 0:
+            tab_indices_with_proba_0 = (tab_probs <= 0)
+            if len(tab_indices_with_proba_0) > batch_size/10:
+                # We only print this message when the situation is really critical
+                # i.e. when many samples got proba inferior to 0 (I never encountered
+                # this case in the experiments on 60 Atari games)
+                print("We don't succeed to find transitions with all proba > 0, this "
+                      "is probably because of float32 precision."
+                      "Let's set proba to uniform distribution."
+                      "This is suppose to never happen (never encountered "
+                      "in my experiments)."
+                      "If this happen too often, this is probably because"
+                      "your replay memory capacity is set to a really small value")
+            tab_probs[tab_indices_with_proba_0] = 1/self.transitions.get_current_capacity()
 
         tab_byte_transition = self.transitions.get_byte_multiple_transition(
             data_indexes, self.history, self.n
